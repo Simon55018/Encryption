@@ -25,11 +25,15 @@ SOURCES += \
         src/CAES.cpp
 
 HEADERS += \
-        include/CAES.h
+        include/CAES.h \
+    src/CAES_p.h
 unix {
     target.path = /usr/lib
     INSTALLS += target
 }
+
+INCLUDEPATH += \
+    include
 
 #begin 输出路径
 CONFIG(debug, debug|release){
