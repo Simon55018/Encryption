@@ -10,11 +10,25 @@ public:
     CAESPrivate();
     ~CAESPrivate();
 
-    void runKeyExpansion(AESKeyType emKeyType, quint8* pucKeyBytes);     //密匙初始化
+    void runKeyExpansion(AESKeyType emKeyType, quint8* pucKey);     //密匙初始化
     void setKeyLength(AESKeyType emKeyType);    //设置密匙长度
     void expandKey();       //密匙扩展函数
     void keySubstitute(quint8 * pucInput, quint8* pucOutput);       //密匙字节代换函数
     void keyShift(quint8 * pucInput, quint8* pucOutput);            //密匙移位函数
+    void keyAddRound(quint32 lRound);
+    void byteSubstitute();
+    void byteInvertSubstitube();
+    void rowShift();
+    void rowInvertShift();
+    void columnMix();
+    void columnInvertMix();
+    quint8 constantMixFunc01(quint8 ucData);
+    quint8 constantMixFunc02(quint8 ucData);
+    quint8 constantMixFunc03(quint8 ucData);
+    quint8 constantMixFunc09(quint8 ucData);
+    quint8 constantMixFunc0b(quint8 ucData);
+    quint8 constantMixFunc0d(quint8 ucData);
+    quint8 constantMixFunc0e(quint8 ucData);
 
 private:
     CAES        *q_ptr;
@@ -23,8 +37,9 @@ private:
     static const quint8 m_aucISBox[16*16];      // 逆S盒
     static const quint8 m_aucConstant[11*4];    // 常量轮转表
 
-    quint8      *m_pucKey;                      // 密钥
-    quint8      *m_pucKeySchedule;              // 密钥数组
+    quint8      *m_pucKey;                      // 密钥(长度32)
+    quint8      *m_pucKeySchedule;              // 密钥数组(16*15二维数据)
+    quint8      *m_pucStateMatrix;              // 状态矩阵(4*4矩阵)
     int         m_lBlockSize;                   // 块大小
     int         m_lKeySize;                     // 密钥长度
     int         m_lRoundNumber;                 // 加密轮数

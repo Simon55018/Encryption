@@ -1,37 +1,34 @@
 #include "CAES_p.h"
 
+#define MAX_KEY_SIZE            32
+#define SIZE_KEY_SCHEDULE       16*15
+
+#define ROW_STATE_MATRIX        4
+#define COLUMN_STATE_MATRIX     4
+#define SIZE_STATE_MATRIX       ROW_STATE_MATRIX*COLUMN_STATE_MATRIX
+
 CAES::CAES()
     : d_ptr(new CAESPrivate)
 {
     d_ptr->q_ptr = NULL;
 }
 
-CAES::CAES(quint8 *pucKey, AESKeyType emKeyType)
+CAES::CAES(char *pucKey, AESKeyType emKeyType)
     : d_ptr(new CAESPrivate)
 {
-    Q_D(CAES);
-
     d_ptr->q_ptr = NULL;
 
-    d->m_pucKey = (quint8*)malloc(emKeyType);
-    memcpy(d->m_pucKey, pucKey, emKeyType);
-    d->runKeyExpansion(emKeyType, pucKey);
+    setKey(pucKey, emKeyType);
 }
 
 CAES::~CAES()
 {
-    Q_D(CAES);
-    if( NULL != d->m_pucKey )
-    {
-        free(d->m_pucKey);
-        d->m_pucKey = NULL;
-    }
 }
 
-bool CAES::AESEncryptionFile(QFile *pOriginFile, QFile *pEncryptFile)
+void CAES::AESEncryptionFile(QFile *pOriginFile, QFile *pEncryptFile)
 {
-    quint8 aucInput[16];
-    quint8 aucOutput[16];
+    char *aucInput = (char*)calloc(16, sizeof(char));
+    char *aucOutput = (char*)calloc(16, sizeof(char));
 
     if( pOriginFile->open(QIODevice::ReadOnly)
             && pEncryptFile->open(QIODevice::WriteOnly|QIODevice::Truncate) )
@@ -47,12 +44,26 @@ bool CAES::AESEncryptionFile(QFile *pOriginFile, QFile *pEncryptFile)
 
     pOriginFile->close();
     pEncryptFile->close();
+
+    free(aucInput);
+    aucInput = NULL;
+
+    free(aucOutput);
+    aucOutput = NULL;
 }
 
-bool CAES::AESDecryptionFile(QFile *pOriginFile, QFile *pDecryptFile)
+void CAES::AESEncryptionFile(QString sOriginFileName, QString sEncryptFileName)
 {
-    quint8 aucInput[16];
-    quint8 aucOutput[16];
+    QFile fileOrigin(sOriginFileName);
+    QFile fileEncrypt(sEncryptFileName);
+
+    this->AESEncryptionFile(&fileOrigin, &fileEncrypt);
+}
+
+void CAES::AESDecryptionFile(QFile *pOriginFile, QFile *pDecryptFile)
+{
+    char *aucInput = (char*)calloc(16, sizeof(char));
+    char *aucOutput = (char*)calloc(16, sizeof(char));
 
     if( pOriginFile->open(QIODevice::ReadOnly)
             && pDecryptFile->open(QIODevice::WriteOnly|QIODevice::Truncate) )
@@ -68,33 +79,208 @@ bool CAES::AESDecryptionFile(QFile *pOriginFile, QFile *pDecryptFile)
 
     pOriginFile->close();
     pDecryptFile->close();
+
+    free(aucInput);
+    aucInput = NULL;
+
+    free(aucOutput);
+    aucOutput = NULL;
 }
 
-bool CAES::AESEncryption(quint8 *pucOriginData, quint8 *pucEncryptData, quint8 *pucKey, AESKeyType emKeyType)
+void CAES::AESDecryptionFile(QString sOriginFileName, QString sDecryptFileName)
 {
+    QFile fileOrigin(sOriginFileName);
+    QFile fileDecrypt(sDecryptFileName);
 
+    this->AESDecryptionFile(&fileOrigin, &fileDecrypt);
 }
 
-bool CAES::AESDecryption(quint8 *pucOriginData, quint8 *pucDecryptData, quint8 *pucKey, AESKeyType emKeyType)
+quint32 CAES::AESEncryptionString(void *pOriginData, quint32 ulDataInLength, void *pEncryptData)
 {
+    quint32 ulDataOutLength = 0;
+    char *pucCurInBuff = (char*)pOriginData;
+    char *pucCurOutBuff = (char*)pEncryptData;
+    quint32 ulBlockNUm = ulDataInLength/16;
+    quint32 ulLeftNum = ulDataInLength%16;
 
+    for( quint32 i = 0; i < ulBlockNUm; ++i )
+    {
+        AESEncryption(pucCurInBuff, pucCurOutBuff);
+        pucCurInBuff += 16;
+        pucCurOutBuff += 16;
+        ulDataOutLength += 16;
+    }
+
+    if( ulLeftNum )
+    {
+        char *ucInBuffer = (char*)calloc(16, sizeof(char));
+        memcpy(ucInBuffer, pucCurInBuff, ulLeftNum);
+        AESEncryption(ucInBuffer, pucCurOutBuff);
+        pucCurOutBuff += 16;
+        ulDataOutLength += 16;
+
+        free(ucInBuffer);
+        ucInBuffer = NULL;
+    }
+
+    //
+    char *ucExtraBuff = (char*)calloc(16, sizeof(char));
+    *((quint32*)ucExtraBuff) = 16 + (16 - ulLeftNum)%16;
+    AESEncryption(ucExtraBuff, pucCurOutBuff);
+    ulDataOutLength += 16;
+
+    free(ucExtraBuff);
+    ucExtraBuff = NULL;
+
+    return ulDataOutLength;
+}
+
+quint32 CAES::AESDecryptionString(void *pOriginData, quint32 ulDataInLength, void *pDecryptData)
+{
+    quint32 ulDataOutLength= 0;
+    char *pucCurInBuff = (char*)pOriginData;
+    char *pucCurOutBuff = (char*)pDecryptData;
+    quint32 ulBlockNum = ulDataInLength/16;
+    quint32 ulLeftNum = ulDataInLength%16;
+    if(ulLeftNum)
+    {
+        return -1;
+    }
+    for( quint32 i = 0; i < ulBlockNum; ++i)
+    {
+        AESDecryption(pucCurInBuff,pucCurOutBuff);
+        pucCurInBuff += 16;
+        pucCurOutBuff += 16;
+        ulDataOutLength += 16;
+    }
+
+    char *pucExtraInBuff = pucCurOutBuff - 16;
+    quint32 ulExtraBytes=*((quint32 *)pucExtraInBuff);
+    return (ulDataOutLength-ulExtraBytes);
+}
+
+void CAES::AESEncryptionString(const QString sOriginData, QString &sEncryptData)
+{
+    quint32 ulDataInLength = (quint32)sOriginData.length();
+    char *pOutput = (char*)calloc(ulDataInLength + 32, sizeof(char));
+
+    quint32 ulDataOutLength = this->AESEncryptionString(sOriginData.toLatin1().data(), ulDataInLength, pOutput);
+    sEncryptData = QString::fromLatin1(pOutput, ulDataOutLength);
+}
+
+void CAES::AESDecryptionString(const QString sOriginData, QString &sDecryptData)
+{
+    quint32 ulDataInLength = (quint32)sOriginData.length();
+    char *pOutput = (char*)calloc(ulDataInLength, sizeof(char));
+
+    quint32 ulDataOutLength = this->AESDecryptionString(sOriginData.toLatin1().data(), ulDataInLength, pOutput);
+    sDecryptData = QString::fromLatin1(pOutput, ulDataOutLength);
+}
+
+void CAES::AESEncryption(char *pucOriginData, char *pucEncryptData, char *pucKey, AESKeyType emKeyType)
+{
+    Q_D(CAES);
+    if( pucKey )
+    {
+        setKey(pucKey, emKeyType);
+    }
+    memset(d->m_pucStateMatrix, 0, SIZE_STATE_MATRIX*sizeof(quint8));
+
+    for( int i = 0; i < (4 * d->m_lBlockSize); ++i )
+    {
+        d->m_pucStateMatrix[COLUMN_STATE_MATRIX*(i%4) + i/4] = (quint8)pucOriginData[i];
+    }
+
+    d->keyAddRound(0);
+
+    for( int round = 1; round <= (d->m_lRoundNumber - 1); ++round )
+    {
+        d->byteSubstitute();
+        d->rowShift();
+        d->columnMix();
+        d->keyAddRound(round);
+    }
+    d->byteSubstitute();
+    d->rowShift();
+    d->keyAddRound(d->m_lRoundNumber);
+
+    for( int i = 0; i < (ROW_STATE_MATRIX * d->m_lBlockSize); ++i )
+    {
+        pucEncryptData[i] = (char)d->m_pucStateMatrix[COLUMN_STATE_MATRIX*(i%4) + (i/4)];
+    }
+}
+
+void CAES::AESDecryption(char *pucOriginData, char *pucDecryptData, char *pucKey, AESKeyType emKeyType)
+{
+    Q_D(CAES);
+    if( pucKey )
+    {
+        setKey(pucKey, emKeyType);
+    }
+    memset(d->m_pucStateMatrix, 0, SIZE_STATE_MATRIX*sizeof(quint8));
+
+    for( int i = 0; i < (4 * d->m_lBlockSize); ++i )
+    {
+        d->m_pucStateMatrix[COLUMN_STATE_MATRIX*(i%4) + i/4] = (quint8)pucOriginData[i];
+    }
+
+    d->keyAddRound(d->m_lRoundNumber);
+
+    for( int round = d->m_lRoundNumber - 1; round >= 1; --round )
+    {
+        d->rowInvertShift();
+        d->byteInvertSubstitube();
+        d->keyAddRound(round);
+        d->columnInvertMix();
+    }
+    d->rowInvertShift();
+    d->byteInvertSubstitube();
+    d->keyAddRound(0);
+
+    for( int i = 0; i < (ROW_STATE_MATRIX * d->m_lBlockSize); ++i )
+    {
+        pucDecryptData[i] = (char)d->m_pucStateMatrix[COLUMN_STATE_MATRIX*(i%4) + (i/4)];
+    }
+}
+
+void CAES::setKey(char *pucKey, AESKeyType emKeyType)
+{
+    Q_D(CAES);
+    d->runKeyExpansion(emKeyType, (quint8*)pucKey);
 }
 
 CAESPrivate::CAESPrivate()
 {
     q_ptr = NULL;
-    m_pucKey = NULL;
-    m_pucKeySchedule = (quint8*)calloc(16*15, sizeof(quint8));
+    m_pucKey = (quint8*)malloc(MAX_KEY_SIZE*sizeof(quint8));
+    m_pucKeySchedule = (quint8*)malloc(SIZE_KEY_SCHEDULE*sizeof(quint8));
+    m_pucStateMatrix = (quint8*)malloc(SIZE_STATE_MATRIX*sizeof(quint8));
 }
 
 CAESPrivate::~CAESPrivate()
 {
+    if( NULL != m_pucKey )
+    {
+        free(m_pucKey);
+        m_pucKey = NULL;
+    }
 
+    if( NULL != m_pucKeySchedule )
+    {
+        free(m_pucKeySchedule);
+        m_pucKeySchedule = NULL;
+    }
+
+    if( NULL != m_pucStateMatrix )
+    {
+        m_pucStateMatrix = NULL;
+    }
 }
 
-void CAESPrivate::runKeyExpansion(AESKeyType emKeyType, quint8 *pucKeyBytes)
+void CAESPrivate::runKeyExpansion(AESKeyType emKeyType, quint8 *pucKey)
 {
     setKeyLength(emKeyType);
+    memcpy(m_pucKey, pucKey, emKeyType);
     expandKey();
 }
 
@@ -120,6 +306,7 @@ void CAESPrivate::setKeyLength(AESKeyType emKeyType)
 
 void CAESPrivate::expandKey()
 {
+    memset(m_pucKeySchedule, 0, SIZE_KEY_SCHEDULE*sizeof(quint8));
     for( int row = 0; row < m_lKeySize; ++row)  //lKeySize=4,6,8得到初始密码
     {
         m_pucKeySchedule[4*row+0] = m_pucKey[4*row+0];
@@ -144,7 +331,7 @@ void CAESPrivate::expandKey()
             keyShift(aucTemp, aucResultShift);
             //keySubstitute使用置换表Sbox,针对密匙次序表w[]的给定行执行逐字节替换
             keySubstitute(aucResultShift, aucResultSub);
-            memcpy(aucTemp, aucResultSub, strlen(aucTemp));
+            memcpy(aucTemp, aucResultSub, 4*sizeof(quint8));
 
             aucTemp[0] = (quint8)( (qint32)aucTemp[0] ^ (qint32) m_aucConstant[4*(row/m_lKeySize)+0] );
             aucTemp[1] = (quint8)( (qint32)aucTemp[1] ^ (qint32) m_aucConstant[4*(row/m_lKeySize)+1] );
@@ -154,7 +341,7 @@ void CAESPrivate::expandKey()
         else if( m_lKeySize > 6 && ( 4 == row % m_lKeySize ) )
         {
             keySubstitute(aucTemp, aucResultSub);
-            memcpy(aucTemp, aucResultSub, strlen(aucTemp));
+            memcpy(aucTemp, aucResultSub, 4*sizeof(quint8));
         }
 
         // m_pucKeySchedule[row] = m_pucKeySchedule[row-m_lKeySize] xor aucTemp
@@ -179,4 +366,235 @@ void CAESPrivate::keyShift(quint8 *pucInput, quint8 *pucOutput)
     pucOutput[1] = pucInput[2];
     pucOutput[2] = pucInput[3];
     pucOutput[3] = pucInput[0];
+}
+
+void CAESPrivate::keyAddRound(quint32 lRound)
+{
+    for( int row = 0; row < ROW_STATE_MATRIX; ++row )
+    {
+        for( int column = 0; column < COLUMN_STATE_MATRIX; ++column )
+        {
+            m_pucStateMatrix[COLUMN_STATE_MATRIX*row + column] =
+                    (quint8)((qint32)m_pucStateMatrix[COLUMN_STATE_MATRIX*row + column] ^
+                             (qint32)m_pucKeySchedule[ROW_STATE_MATRIX*((lRound*ROW_STATE_MATRIX)+column)+row]);
+        }
+    }
+}
+
+void CAESPrivate::byteSubstitute()
+{
+    for( int row = 0; row < ROW_STATE_MATRIX; ++row )
+    {
+        for( int column = 0; column < COLUMN_STATE_MATRIX; ++column )
+        {
+            m_pucStateMatrix[COLUMN_STATE_MATRIX*row + column] =
+                    m_aucSBox[ 16*( m_pucStateMatrix[COLUMN_STATE_MATRIX*row + column] >> 4) +
+                                  ( m_pucStateMatrix[COLUMN_STATE_MATRIX*row + column] & 0x0f) ];
+        }
+    }
+}
+
+void CAESPrivate::byteInvertSubstitube()
+{
+    for( int row = 0; row < ROW_STATE_MATRIX; ++row )
+    {
+        for( int column = 0; column < COLUMN_STATE_MATRIX; ++column )
+        {
+            m_pucStateMatrix[COLUMN_STATE_MATRIX*row + column] =
+                    m_aucISBox[ 16*( m_pucStateMatrix[COLUMN_STATE_MATRIX*row + column] >> 4) +
+                                   ( m_pucStateMatrix[COLUMN_STATE_MATRIX*row + column] & 0x0f) ];
+        }
+    }
+}
+
+void CAESPrivate::rowShift()
+{
+    quint8 *pucTemp = (quint8*)malloc(SIZE_STATE_MATRIX*sizeof(quint8));
+
+    for( int row = 0; row < ROW_STATE_MATRIX; ++row )
+    {
+        for( int column = 0; column < COLUMN_STATE_MATRIX; ++column )
+        {
+            pucTemp[COLUMN_STATE_MATRIX*row + column] =
+                    m_pucStateMatrix[COLUMN_STATE_MATRIX*row + column];
+        }
+    }
+
+    for( int row = 0; row < ROW_STATE_MATRIX; ++row )
+    {
+        for( int column =0; column < COLUMN_STATE_MATRIX; ++column )
+        {
+            m_pucStateMatrix[COLUMN_STATE_MATRIX*row + column] =
+                    pucTemp[COLUMN_STATE_MATRIX*row + (column+row) % m_lBlockSize];
+        }
+    }
+
+    free(pucTemp);
+    pucTemp = NULL;
+}
+
+void CAESPrivate::rowInvertShift()
+{
+    quint8 *pucTemp = (quint8*)malloc(SIZE_STATE_MATRIX*sizeof(quint8));
+
+    for( int row = 0; row < ROW_STATE_MATRIX; ++row )
+    {
+        for( int column = 0; column < COLUMN_STATE_MATRIX; ++column )
+        {
+            pucTemp[COLUMN_STATE_MATRIX*row + column] =
+                    m_pucStateMatrix[COLUMN_STATE_MATRIX*row + column];
+        }
+    }
+
+    for( int row = 0; row < ROW_STATE_MATRIX; ++row )
+    {
+        for( int column =0; column < COLUMN_STATE_MATRIX; ++column )
+        {
+            m_pucStateMatrix[COLUMN_STATE_MATRIX*row + (column+row) % m_lBlockSize] =
+                                        pucTemp[COLUMN_STATE_MATRIX*row + column];
+        }
+    }
+
+    free(pucTemp);
+    pucTemp = NULL;
+}
+
+void CAESPrivate::columnMix()
+{
+    quint8 *pucTemp = (quint8*)malloc(SIZE_STATE_MATRIX*sizeof(quint8));
+
+    for( int row = 0; row < ROW_STATE_MATRIX; ++row )
+    {
+        for( int column = 0; column < COLUMN_STATE_MATRIX; ++column )
+        {
+            pucTemp[COLUMN_STATE_MATRIX*row + column] = m_pucStateMatrix[COLUMN_STATE_MATRIX*row + column];
+        }
+    }
+
+    for( int column = 0; column < COLUMN_STATE_MATRIX; ++column )
+    {
+        m_pucStateMatrix[column] =
+                        (quint8)( (qint32)constantMixFunc02(pucTemp[column]) ^
+                                  (qint32)constantMixFunc03(pucTemp[ROW_STATE_MATRIX*column]) ^
+                                  (qint32)constantMixFunc01(pucTemp[ROW_STATE_MATRIX*2+column]) ^
+                                  (qint32)constantMixFunc01(pucTemp[ROW_STATE_MATRIX*3+column]));
+
+        m_pucStateMatrix[ROW_STATE_MATRIX*1 + column] =
+                        (quint8)( (qint32)constantMixFunc01(pucTemp[column]) ^
+                                  (qint32)constantMixFunc02(pucTemp[ROW_STATE_MATRIX*column]) ^
+                                  (qint32)constantMixFunc03(pucTemp[ROW_STATE_MATRIX*2+column]) ^
+                                  (qint32)constantMixFunc01(pucTemp[ROW_STATE_MATRIX*3+column]));
+
+        m_pucStateMatrix[ROW_STATE_MATRIX*2 + column] =
+                        (quint8)( (qint32)constantMixFunc01(pucTemp[column]) ^
+                                  (qint32)constantMixFunc01(pucTemp[ROW_STATE_MATRIX*column]) ^
+                                  (qint32)constantMixFunc02(pucTemp[ROW_STATE_MATRIX*2+column]) ^
+                                  (qint32)constantMixFunc03(pucTemp[ROW_STATE_MATRIX*3+column]));
+
+        m_pucStateMatrix[ROW_STATE_MATRIX*3 + column] =
+                        (quint8)( (qint32)constantMixFunc03(pucTemp[column]) ^
+                                  (qint32)constantMixFunc01(pucTemp[ROW_STATE_MATRIX*column]) ^
+                                  (qint32)constantMixFunc01(pucTemp[ROW_STATE_MATRIX*2+column]) ^
+                                  (qint32)constantMixFunc02(pucTemp[ROW_STATE_MATRIX*3+column]));
+    }
+
+    free(pucTemp);
+    pucTemp = NULL;
+}
+
+void CAESPrivate::columnInvertMix()
+{
+    quint8 *pucTemp = (quint8*)malloc(SIZE_STATE_MATRIX*sizeof(quint8));
+
+    for( int row = 0; row < ROW_STATE_MATRIX; ++row )
+    {
+        for( int column = 0; column < COLUMN_STATE_MATRIX; ++column )
+        {
+            pucTemp[COLUMN_STATE_MATRIX*row + column] =
+                    m_pucStateMatrix[COLUMN_STATE_MATRIX*row + column];
+        }
+    }
+
+    for( int column = 0; column < COLUMN_STATE_MATRIX; ++column )
+    {
+        m_pucStateMatrix[column] =
+                        (quint8)( (qint32)constantMixFunc0e(pucTemp[column]) ^
+                                  (qint32)constantMixFunc0b(pucTemp[ROW_STATE_MATRIX*column]) ^
+                                  (qint32)constantMixFunc0d(pucTemp[ROW_STATE_MATRIX*2+column]) ^
+                                  (qint32)constantMixFunc09(pucTemp[ROW_STATE_MATRIX*3+column]));
+
+        m_pucStateMatrix[ROW_STATE_MATRIX*1 + column] =
+                        (quint8)( (qint32)constantMixFunc09(pucTemp[column]) ^
+                                  (qint32)constantMixFunc0e(pucTemp[ROW_STATE_MATRIX*column]) ^
+                                  (qint32)constantMixFunc0b(pucTemp[ROW_STATE_MATRIX*2+column]) ^
+                                  (qint32)constantMixFunc0d(pucTemp[ROW_STATE_MATRIX*3+column]));
+
+        m_pucStateMatrix[ROW_STATE_MATRIX*2 + column] =
+                        (quint8)( (qint32)constantMixFunc0d(pucTemp[column]) ^
+                                  (qint32)constantMixFunc09(pucTemp[ROW_STATE_MATRIX*column]) ^
+                                  (qint32)constantMixFunc0e(pucTemp[ROW_STATE_MATRIX*2+column]) ^
+                                  (qint32)constantMixFunc0b(pucTemp[ROW_STATE_MATRIX*3+column]));
+
+        m_pucStateMatrix[ROW_STATE_MATRIX*3 + column] =
+                        (quint8)( (qint32)constantMixFunc0b(pucTemp[column]) ^
+                                  (qint32)constantMixFunc0d(pucTemp[ROW_STATE_MATRIX*column]) ^
+                                  (qint32)constantMixFunc09(pucTemp[ROW_STATE_MATRIX*2+column]) ^
+                                  (qint32)constantMixFunc0e(pucTemp[ROW_STATE_MATRIX*3+column]));
+    }
+
+    free(pucTemp);
+    pucTemp = NULL;
+}
+
+quint8 CAESPrivate::constantMixFunc01(quint8 ucData)
+{
+    return ucData;
+}
+
+quint8 CAESPrivate::constantMixFunc02(quint8 ucData)
+{
+    if( (quint8)ucData < 0x80 )
+    {
+        return (quint8)(qint32)(ucData << 1);
+    }
+    else
+    {
+        return (quint8)( (qint32)(ucData << 1) ^ (qint32)(0x1b) );
+    }
+}
+
+quint8 CAESPrivate::constantMixFunc03(quint8 ucData)
+{
+    return (quint8)( (qint32)constantMixFunc02(ucData) ^ (qint32)ucData );
+}
+
+quint8 CAESPrivate::constantMixFunc09(quint8 ucData)
+{
+    return (quint8)( (qint32)constantMixFunc02(constantMixFunc02(constantMixFunc02(ucData))) ^
+                            (qint32)ucData );
+}
+
+quint8 CAESPrivate::constantMixFunc0b(quint8 ucData)
+{
+    //return (quint8)( (qint32)constantMixFunc02(constantMixFunc02(constantMixFunc02(ucData))) ^
+    //                        (qint32)constantMixFunc02(ucData) ^ (qint32)ucData );
+    return (quint8)( (qint32)constantMixFunc09(ucData) ^
+                                    (qint32)constantMixFunc02(ucData));
+}
+
+quint8 CAESPrivate::constantMixFunc0d(quint8 ucData)
+{
+    //return (quint8)( (qint32)constantMixFunc02(constantMixFunc02(constantMixFunc02(ucData))) ^
+    //                       (qint32)constantMixFunc02(constantMixFunc02(ucData)) ^ (qint32)ucData );
+    return (quint8)( (qint32)constantMixFunc09(ucData) ^
+                                    (qint32)constantMixFunc02(constantMixFunc02(ucData)));
+}
+
+quint8 CAESPrivate::constantMixFunc0e(quint8 ucData)
+{
+    //return (quint8)( (qint32)constantMixFunc02(constantMixFunc02(constantMixFunc02(ucData))) ^
+    //                        (qint32)constantMixFunc02(constantMixFunc02(ucData)) ^
+    //                        (qint32)constantMixFunc02(ucData) );
+    return (quint8)( (qint32)constantMixFunc0d(ucData) ^ (qint32)ucData ^
+                                    (qint32)constantMixFunc02(ucData));
 }

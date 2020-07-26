@@ -20,19 +20,26 @@ class CAES
 
 public:
     CAES();
-    explicit CAES(quint8 *pucKey, AESKeyType emKeyType = EM_AES_128);
+    explicit CAES(char *pucKey, AESKeyType emKeyType = EM_AES_128);
     ~CAES();
 
-    bool AESEncryptionFile(QFile *pOriginFile, QFile *pEncryptFile);
-    bool AESDecryptionFile(QFile *pOriginFile, QFile *pDecryptFile);
+    void AESEncryptionFile(QFile *pOriginFile, QFile *pEncryptFile);
+    void AESEncryptionFile(QString sOriginFileName, QString sEncryptFileName);
+    void AESDecryptionFile(QFile *pOriginFile, QFile *pDecryptFile);
+    void AESDecryptionFile(QString sOriginFileName, QString sDecryptFileName);
 
-    bool AESEncryptionString(void *pOriginData, quint32 ulDataInLength, void *pEncryptData);
-    bool AESDecryptionString(void *pOriginData, quint32 ulDataInLength, void *pDecryptData);
+    quint32 AESEncryptionString(void *pOriginData, quint32 ulDataInLength, void *pEncryptData);
+    quint32 AESDecryptionString(void *pOriginData, quint32 ulDataInLength, void *pDecryptData);
 
-    bool AESEncryption(quint8 *pucOriginData, quint8 *pucEncryptData,
-                       quint8 *pucKey = 0, AESKeyType emKeyType = EM_AES_128);
-    bool AESDecryption(quint8 *pucOriginData, quint8 *pucDecryptData,
-                       quint8 *pucKey = 0, AESKeyType emKeyType = EM_AES_128);
+    void AESEncryptionString(const QString sOriginData, QString &sEncryptData);
+    void AESDecryptionString(const QString sOriginData, QString &sDecryptData);
+
+    void AESEncryption(char *pucOriginData, char *pucEncryptData,
+                       char *pucKey = 0, AESKeyType emKeyType = EM_AES_128);
+    void AESDecryption(char *pucOriginData, char *pucDecryptData,
+                       char *pucKey = 0, AESKeyType emKeyType = EM_AES_128);
+
+    void setKey(char *pucKey, AESKeyType emKeyType = EM_AES_128);
 
 private:
     QScopedPointer<CAESPrivate>     d_ptr;
