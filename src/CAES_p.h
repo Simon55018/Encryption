@@ -10,18 +10,76 @@ public:
     CAESPrivate();
     ~CAESPrivate();
 
-    void runKeyExpansion(AESKeyType emKeyType, quint8* pucKey);     //密匙初始化
-    void setKeyLength(AESKeyType emKeyType);    //设置密匙长度
-    void expandKey();       //密匙扩展函数
-    void keySubstitute(quint8 * pucInput, quint8* pucOutput);       //密匙字节代换函数
-    void keyShift(quint8 * pucInput, quint8* pucOutput);            //密匙移位函数
+    /*!
+     * \brief checkAESType  检查AES密钥类型
+     * \param emKeyType     [in]    AES密钥类型
+     * \return 成功/失败
+     */
+    bool checkAESType(AESKeyType emKeyType);
+    /*!
+     * \brief runKeyExpansion   密匙初始化
+     * \param emKeyType         [in]        AES密钥类型
+     * \param pucKey            [in]        AES密钥
+     * \return 成功/失败
+     */
+    bool runKeyExpansion(AESKeyType emKeyType, quint8* pucKey);
+    /*!
+     * \brief setKeyLength  根据密钥类型设置密匙长度
+     * \param emKeyType     [in]        AES密钥类型
+     * \return 成功/失败
+     */
+    bool setKeyLength(AESKeyType emKeyType);
+
+    /*!
+     * \brief expandKey     密钥扩展函数
+     */
+    void expandKey();
+    /*!
+     * \brief keySubstitute 密钥字节代换函数
+     * \param pucInput      [in]        密钥输入
+     * \param pucOutput     [in]        密钥输出
+     */
+    void keySubstitute(quint8 * pucInput, quint8* pucOutput);
+    /*!
+     * \brief keyShift      密钥移位函数
+     * \param pucInput      [in]        密钥输入
+     * \param pucOutput     [in]        密钥输出
+     */
+    void keyShift(quint8 * pucInput, quint8* pucOutput);
+    /*!
+     * \brief keyAddRound   密钥轮加函数
+     * \param lRound        [in]        轮数
+     */
     void keyAddRound(quint32 lRound);
+    /*!
+     * \brief byteSubstitute        字节代换函数
+     */
     void byteSubstitute();
+    /*!
+     * \brief byteInvertSubstitube  字节代换逆变换函数
+     */
     void byteInvertSubstitube();
+    /*!
+     * \brief rowShift          行移位函数
+     */
     void rowShift();
+    /*!
+     * \brief rowInvertShift    行移位逆变换函数
+     */
     void rowInvertShift();
+    /*!
+     * \brief columnMix         列混淆函数
+     */
     void columnMix();
+    /*!
+     * \brief columnInvertMix   列混淆逆变换函数
+     */
     void columnInvertMix();
+    /*!
+     * \brief constantMixFunc01 列混淆常数函数
+     * \param ucData    [in]    数据
+     * \return
+     */
     quint8 constantMixFunc01(quint8 ucData);
     quint8 constantMixFunc02(quint8 ucData);
     quint8 constantMixFunc03(quint8 ucData);
@@ -37,6 +95,7 @@ private:
     static const quint8 m_aucISBox[16*16];      // 逆S盒
     static const quint8 m_aucConstant[11*4];    // 常量轮转表
 
+    AESKeyType  m_emKeyType;
     quint8      *m_pucKey;                      // 密钥(长度32)
     quint8      *m_pucKeySchedule;              // 密钥数组(16*15二维数据)
     quint8      *m_pucStateMatrix;              // 状态矩阵(4*4矩阵)
@@ -47,7 +106,7 @@ private:
 
 const quint8 CAESPrivate::m_aucSBox[16*16]=
 {
-         /* 0     1     2     3     4     5     6     7     8     9     a     ucData     c     d     e     f */
+         /* 0     1     2     3     4     5     6     7     8     9     a   ucData  c     d     e     f */
     /*0*/  0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76,
     /*1*/  0xca, 0x82, 0xc9, 0x7d, 0xfa, 0x59, 0x47, 0xf0, 0xad, 0xd4, 0xa2, 0xaf, 0x9c, 0xa4, 0x72, 0xc0,
     /*2*/  0xb7, 0xfd, 0x93, 0x26, 0x36, 0x3f, 0xf7, 0xcc, 0x34, 0xa5, 0xe5, 0xf1, 0x71, 0xd8, 0x31, 0x15,
@@ -68,7 +127,7 @@ const quint8 CAESPrivate::m_aucSBox[16*16]=
 
 const quint8 CAESPrivate::m_aucISBox[16*16]=
 {
-         /* 0     1     2     3     4     5     6     7     8     9     a     ucData     c     d     e     f */
+         /* 0     1     2     3     4     5     6     7     8     9     a   ucData  c     d     e     f */
     /*0*/  0x52, 0x09, 0x6a, 0xd5, 0x30, 0x36, 0xa5, 0x38, 0xbf, 0x40, 0xa3, 0x9e, 0x81, 0xf3, 0xd7, 0xfb,
     /*1*/  0x7c, 0xe3, 0x39, 0x82, 0x9b, 0x2f, 0xff, 0x87, 0x34, 0x8e, 0x43, 0x44, 0xc4, 0xde, 0xe9, 0xcb,
     /*2*/  0x54, 0x7b, 0x94, 0x32, 0xa6, 0xc2, 0x23, 0x3d, 0xee, 0x4c, 0x95, 0x0b, 0x42, 0xfa, 0xc3, 0x4e,
