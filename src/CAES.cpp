@@ -38,7 +38,7 @@ void CAES::AESEncryptionFile(QFile *pOriginFile, QFile *pEncryptFile)
             memset(aucInput, 0, 16);
             pOriginFile->read(aucInput, 16);
             AESEncryption(aucInput, aucOutput);
-            pEncryptFile->write(aucOutput);
+            pEncryptFile->write(aucOutput, 16);
         }
     }
 
@@ -73,7 +73,7 @@ void CAES::AESDecryptionFile(QFile *pOriginFile, QFile *pDecryptFile)
             memset(aucInput, 0, 16);
             pOriginFile->read(aucInput, 16);
             AESDecryption(aucInput, aucOutput);
-            pDecryptFile->write(aucOutput);
+            pDecryptFile->write(aucOutput, 16);
         }
     }
 
@@ -475,25 +475,25 @@ void CAESPrivate::columnMix()
     {
         m_pucStateMatrix[column] =
                         (quint8)( (qint32)constantMixFunc02(pucTemp[column]) ^
-                                  (qint32)constantMixFunc03(pucTemp[ROW_STATE_MATRIX*column]) ^
+                                  (qint32)constantMixFunc03(pucTemp[ROW_STATE_MATRIX*1+column]) ^
                                   (qint32)constantMixFunc01(pucTemp[ROW_STATE_MATRIX*2+column]) ^
                                   (qint32)constantMixFunc01(pucTemp[ROW_STATE_MATRIX*3+column]));
 
         m_pucStateMatrix[ROW_STATE_MATRIX*1 + column] =
                         (quint8)( (qint32)constantMixFunc01(pucTemp[column]) ^
-                                  (qint32)constantMixFunc02(pucTemp[ROW_STATE_MATRIX*column]) ^
+                                  (qint32)constantMixFunc02(pucTemp[ROW_STATE_MATRIX*1+column]) ^
                                   (qint32)constantMixFunc03(pucTemp[ROW_STATE_MATRIX*2+column]) ^
                                   (qint32)constantMixFunc01(pucTemp[ROW_STATE_MATRIX*3+column]));
 
         m_pucStateMatrix[ROW_STATE_MATRIX*2 + column] =
                         (quint8)( (qint32)constantMixFunc01(pucTemp[column]) ^
-                                  (qint32)constantMixFunc01(pucTemp[ROW_STATE_MATRIX*column]) ^
+                                  (qint32)constantMixFunc01(pucTemp[ROW_STATE_MATRIX*1+column]) ^
                                   (qint32)constantMixFunc02(pucTemp[ROW_STATE_MATRIX*2+column]) ^
                                   (qint32)constantMixFunc03(pucTemp[ROW_STATE_MATRIX*3+column]));
 
         m_pucStateMatrix[ROW_STATE_MATRIX*3 + column] =
                         (quint8)( (qint32)constantMixFunc03(pucTemp[column]) ^
-                                  (qint32)constantMixFunc01(pucTemp[ROW_STATE_MATRIX*column]) ^
+                                  (qint32)constantMixFunc01(pucTemp[ROW_STATE_MATRIX*1+column]) ^
                                   (qint32)constantMixFunc01(pucTemp[ROW_STATE_MATRIX*2+column]) ^
                                   (qint32)constantMixFunc02(pucTemp[ROW_STATE_MATRIX*3+column]));
     }
@@ -519,25 +519,25 @@ void CAESPrivate::columnInvertMix()
     {
         m_pucStateMatrix[column] =
                         (quint8)( (qint32)constantMixFunc0e(pucTemp[column]) ^
-                                  (qint32)constantMixFunc0b(pucTemp[ROW_STATE_MATRIX*column]) ^
+                                  (qint32)constantMixFunc0b(pucTemp[ROW_STATE_MATRIX*1+column]) ^
                                   (qint32)constantMixFunc0d(pucTemp[ROW_STATE_MATRIX*2+column]) ^
                                   (qint32)constantMixFunc09(pucTemp[ROW_STATE_MATRIX*3+column]));
 
         m_pucStateMatrix[ROW_STATE_MATRIX*1 + column] =
                         (quint8)( (qint32)constantMixFunc09(pucTemp[column]) ^
-                                  (qint32)constantMixFunc0e(pucTemp[ROW_STATE_MATRIX*column]) ^
+                                  (qint32)constantMixFunc0e(pucTemp[ROW_STATE_MATRIX*1+column]) ^
                                   (qint32)constantMixFunc0b(pucTemp[ROW_STATE_MATRIX*2+column]) ^
                                   (qint32)constantMixFunc0d(pucTemp[ROW_STATE_MATRIX*3+column]));
 
         m_pucStateMatrix[ROW_STATE_MATRIX*2 + column] =
                         (quint8)( (qint32)constantMixFunc0d(pucTemp[column]) ^
-                                  (qint32)constantMixFunc09(pucTemp[ROW_STATE_MATRIX*column]) ^
+                                  (qint32)constantMixFunc09(pucTemp[ROW_STATE_MATRIX*1+column]) ^
                                   (qint32)constantMixFunc0e(pucTemp[ROW_STATE_MATRIX*2+column]) ^
                                   (qint32)constantMixFunc0b(pucTemp[ROW_STATE_MATRIX*3+column]));
 
         m_pucStateMatrix[ROW_STATE_MATRIX*3 + column] =
                         (quint8)( (qint32)constantMixFunc0b(pucTemp[column]) ^
-                                  (qint32)constantMixFunc0d(pucTemp[ROW_STATE_MATRIX*column]) ^
+                                  (qint32)constantMixFunc0d(pucTemp[ROW_STATE_MATRIX*1+column]) ^
                                   (qint32)constantMixFunc09(pucTemp[ROW_STATE_MATRIX*2+column]) ^
                                   (qint32)constantMixFunc0e(pucTemp[ROW_STATE_MATRIX*3+column]));
     }
@@ -584,10 +584,10 @@ quint8 CAESPrivate::constantMixFunc0b(quint8 ucData)
 
 quint8 CAESPrivate::constantMixFunc0d(quint8 ucData)
 {
-    //return (quint8)( (qint32)constantMixFunc02(constantMixFunc02(constantMixFunc02(ucData))) ^
-    //                       (qint32)constantMixFunc02(constantMixFunc02(ucData)) ^ (qint32)ucData );
-    return (quint8)( (qint32)constantMixFunc09(ucData) ^
-                                    (qint32)constantMixFunc02(constantMixFunc02(ucData)));
+    return (quint8)( (qint32)constantMixFunc02(constantMixFunc02(constantMixFunc02(ucData))) ^
+                           (qint32)constantMixFunc02(constantMixFunc02(ucData)) ^ (qint32)ucData );
+    //return (quint8)( (qint32)constantMixFunc09(ucData) ^
+    //                                (qint32)constantMixFunc02(constantMixFunc02(ucData)));
 }
 
 quint8 CAESPrivate::constantMixFunc0e(quint8 ucData)
