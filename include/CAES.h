@@ -59,7 +59,7 @@ public:
      * \param pEncryptData        [in&out]  加密后字符串指针
      * \return 加密后字符串长度 大于0则成功 等于-1则失败
      */
-    quint32 AESEncryptionString(char *pOriginData, quint32 ulDataInLength, char *pEncryptData);
+    quint32 AESEncryptionString(void *pOriginData, quint32 ulDataInLength, void *pEncryptData);
     /*!
      * \brief AESDecryptionString AES解密字符串
      * \param pOriginData         [in]      源字符串指针
@@ -67,43 +67,7 @@ public:
      * \param pDecryptData        [in&out]  解密后字符串指针
      * \return 解密后字符串长度 大于0则成功 等于-1则失败
      */
-    quint32 AESDecryptionString(char *pOriginData, quint32 ulDataInLength, char *pDecryptData);
-
-    /*!
-     * \brief AESEncryptionString AES加密字符串
-     * \param sOriginData         [in]      源字符串
-     * \param sEncryptData        [in&out]  加密后字符串
-     * \return 成功/失败
-     */
-    bool AESEncryptionString(const QString sOriginData, QString &sEncryptData);
-    /*!
-     * \brief AESDecryptionString AES加密字符串
-     * \param sOriginData         [in]      源字符串
-     * \param sDecryptData        [in&out]  解密后字符串
-     * \return 成功/失败
-     */
-    bool AESDecryptionString(const QString sOriginData, QString &sDecryptData);
-
-    /*!
-     * \brief AESEncryption     AES加密(每次只能加密16bit)
-     * \param pucOriginData     [in]        源字符串
-     * \param pucEncryptData    [in&out]    加密后字符串
-     * \param pucKey            [in]        密钥
-     * \param emKeyType         [in]        AES密钥类型
-     * \return 加密字符串长度, 等于-1则失败
-     */
-    quint32 AESEncryption(char *pucOriginData, char *pucEncryptData,
-                          char *pucKey = 0, AESKeyType emKeyType = EM_AES_128);
-    /*!
-     * \brief AESDecryption     AES解密(每次只能解密16bit)
-     * \param pucOriginData     [in]        源字符串
-     * \param pucDecryptData    [in&out]    解密密后字符串
-     * \param pucKey            [in]        AES密钥
-     * \param emKeyType         [in]        AES密钥类型
-     * \return 解密字符串长度, 等于-1则失败
-     */
-    quint32 AESDecryption(char *pucOriginData, char *pucDecryptData,
-                          char *pucKey = 0, AESKeyType emKeyType = EM_AES_128);
+    quint32 AESDecryptionString(void *pOriginData, quint32 ulDataInLength, void *pDecryptData);
 
     /*!
      * \brief setKey        设置密钥

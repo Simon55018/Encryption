@@ -55,9 +55,9 @@ bool CAES::AESEncryptionFile(QFile *pOriginFile, QFile *pEncryptFile)
         {
             // 每次读取16位, 因为加密操作每次只能操作16位
             pOriginFile->read(aucInput, NUMBER_ENCRYPTION);
-            AESEncryption(aucInput, aucOutput);
+            d->AESEncryption((quint8*)aucInput, (quint8*)aucOutput);
             // 将加密字符串写入
-            pEncryptFile->write(aucOutput);
+            pEncryptFile->write(aucOutput, NUMBER_ENCRYPTION);
 
             // 重置内存
             memset(aucInput, 0, SIZE_ENCRYPT_MALLOC*sizeof(char));
@@ -111,9 +111,9 @@ bool CAES::AESDecryptionFile(QFile *pOriginFile, QFile *pDecryptFile)
         {
             // 每次读取16位, 因为解密操作每次只能操作16位
             pOriginFile->read(aucInput, NUMBER_DECRYPTION);
-            AESDecryption(aucInput, aucOutput);
+            d->AESDecryption((quint8*)aucInput, (quint8*)aucOutput);
             // 将解密字符串写入
-            pDecryptFile->write(aucOutput);
+            pDecryptFile->write(aucOutput, NUMBER_ENCRYPTION);
 
             // 重置内存
             memset(aucInput, 0, SIZE_DECRYPT_MALLOC*sizeof(char));
@@ -145,18 +145,19 @@ bool CAES::AESDecryptionFile(QString sOriginFileName, QString sDecryptFileName)
     return this->AESDecryptionFile(&fileOrigin, &fileDecrypt);
 }
 
-quint32 CAES::AESEncryptionString(char *pOriginData, quint32 ulDataInLength, char *pEncryptData)
+quint32 CAES::AESEncryptionString(void *pOriginData, quint32 ulDataInLength, void *pEncryptData)
 {
     Q_D(CAES);
     // 若设置的密钥类型错误,运行会出错,所以直接返回错误
-    if( !d->checkAESType(d->m_emKeyType) )
+    if( !d->checkAESType(d->m_emKeyType)
+            || NULL == pOriginData || NULL == pEncryptData )
     {
         return -1;
     }
 
     quint32 ulDataOutLength = 0;
-    char *pucCurInBuff = pOriginData;
-    char *pucCurOutBuff = pEncryptData;
+    quint8 *pucCurInBuff = (quint8*)pOriginData;
+    quint8 *pucCurOutBuff = (quint8*)pEncryptData;
     // 每块空间为16位,每次只操作一块空间
     quint32 ulBlockNUm = ulDataInLength / NUMBER_ENCRYPTION;
     // 超出16的倍数的字符串个数
@@ -165,7 +166,7 @@ quint32 CAES::AESEncryptionString(char *pOriginData, quint32 ulDataInLength, cha
     // 按块操作
     for( quint32 i = 0; i < ulBlockNUm; ++i )
     {
-        AESEncryption(pucCurInBuff, pucCurOutBuff);
+        d->AESEncryption(pucCurInBuff, pucCurOutBuff);
         // 每次移位16个字符
         pucCurInBuff += NUMBER_ENCRYPTION;
         pucCurOutBuff += NUMBER_ENCRYPTION;
@@ -177,10 +178,10 @@ quint32 CAES::AESEncryptionString(char *pOriginData, quint32 ulDataInLength, cha
     if( ulLeftNum )
     {
         // 申请空间,补全16位数(其实就在后面补0)
-        char *ucInBuffer = (char*)calloc(SIZE_ENCRYPT_MALLOC, sizeof(char));
+        quint8 *ucInBuffer = (quint8*)calloc(SIZE_ENCRYPT_MALLOC, sizeof(quint8));
         // 赋最后ulLeftNum个char值
         memcpy(ucInBuffer, pucCurInBuff, ulLeftNum);
-        AESEncryption(ucInBuffer, pucCurOutBuff);
+        d->AESEncryption(ucInBuffer, pucCurOutBuff);
         // 移位16个字符
         pucCurOutBuff += NUMBER_ENCRYPTION;
         // 记录操作字符长度
@@ -192,12 +193,12 @@ quint32 CAES::AESEncryptionString(char *pOriginData, quint32 ulDataInLength, cha
     }
 
     // 申请额外字符空间
-    char *ucExtraBuff = (char*)calloc(SIZE_ENCRYPT_MALLOC, sizeof(char));
+    quint8 *ucExtraBuff = (quint8*)calloc(SIZE_ENCRYPT_MALLOC, sizeof(quint8));
     // 计算出额外字符个数,作为加密数据
     *((quint32*)ucExtraBuff) = NUMBER_ENCRYPTION +
                                 (NUMBER_ENCRYPTION - ulLeftNum)%NUMBER_ENCRYPTION;
     // 加密操作
-    AESEncryption(ucExtraBuff, pucCurOutBuff);
+    d->AESEncryption(ucExtraBuff, pucCurOutBuff);
     // 记录操作字符长度
     ulDataOutLength += NUMBER_ENCRYPTION;
 
@@ -208,18 +209,19 @@ quint32 CAES::AESEncryptionString(char *pOriginData, quint32 ulDataInLength, cha
     return ulDataOutLength;
 }
 
-quint32 CAES::AESDecryptionString(char *pOriginData, quint32 ulDataInLength, char *pDecryptData)
+quint32 CAES::AESDecryptionString(void *pOriginData, quint32 ulDataInLength, void *pDecryptData)
 {
     Q_D(CAES);
     // 若设置的密钥类型错误,运行会出错,所以直接返回错误
-    if( !d->checkAESType(d->m_emKeyType) )
+    if( !d->checkAESType(d->m_emKeyType)
+            || NULL == pOriginData || NULL == pDecryptData )
     {
         return -1;
     }
 
     quint32 ulDataOutLength= 0;
-    char *pucCurInBuff = pOriginData;
-    char *pucCurOutBuff = pDecryptData;
+    quint8 *pucCurInBuff = (quint8*)pOriginData;
+    quint8 *pucCurOutBuff = (quint8*)pDecryptData;
     // 每块空间为16位,每次只操作一块空间
     quint32 ulBlockNum = ulDataInLength / NUMBER_DECRYPTION;
     // 超出16的倍数的字符串个数
@@ -234,7 +236,7 @@ quint32 CAES::AESDecryptionString(char *pOriginData, quint32 ulDataInLength, cha
     // 按块操作
     for( quint32 i = 0; i < ulBlockNum; ++i)
     {
-        AESDecryption(pucCurInBuff,pucCurOutBuff);
+        d->AESDecryption(pucCurInBuff,pucCurOutBuff);
         // 每次移位16个字符
         pucCurInBuff += NUMBER_DECRYPTION;
         pucCurOutBuff += NUMBER_DECRYPTION;
@@ -243,173 +245,12 @@ quint32 CAES::AESDecryptionString(char *pOriginData, quint32 ulDataInLength, cha
     }
 
     // 解密字符串最后16位为额外字符串
-    char *pucExtraInBuff = pucCurOutBuff - NUMBER_DECRYPTION;
+    quint8 *pucExtraInBuff = pucCurOutBuff - NUMBER_DECRYPTION;
     // 算出额外字符串的长度
     quint32 ulExtraBytes=*((quint32 *)pucExtraInBuff);
 
     // 返回正确数据长度
     return (ulDataOutLength-ulExtraBytes);
-}
-
-bool CAES::AESEncryptionString(const QString sOriginData, QString &sEncryptData)
-{
-    bool bRet = false;
-
-    // 加密数据长度
-    quint32 ulDataInLength = (quint32)sOriginData.length();
-    // 申请加密字符串内存,由于加密每次需要操作16个数据,若加密数据不为16的倍数,则补全到16个数据
-    // 由于加密过程存在额外数据部分,额外数据为16个,所以多申请个16+16个char的内存
-    char *pOutput = (char*)calloc(ulDataInLength + 32, sizeof(char));
-
-    // 加密并获取加密后数据长度
-    quint32 ulDataOutLength = this->AESEncryptionString(sOriginData.toLatin1().data(), ulDataInLength, pOutput);
-    // 大于0则加密成功
-    if( ulDataOutLength > 0 )
-    {
-        // 字符串转化为QString
-        sEncryptData = QString::fromLatin1(pOutput, ulDataOutLength);
-        bRet = true;
-    }
-
-    // 释放内存
-    free(pOutput);
-    pOutput = NULL;
-
-    return bRet;
-}
-
-bool CAES::AESDecryptionString(const QString sOriginData, QString &sDecryptData)
-{
-    bool bRet = false;
-
-    // 解密数据长度
-    quint32 ulDataInLength = (quint32)sOriginData.length();
-    // 申请解密字符串内存, 由于加密数据存在16个数据额外数据,所以可以少申请15个数据(留一位给'/0')
-    char *pOutput = (char*)calloc(ulDataInLength - 16 + 1, sizeof(char));
-
-    // 解密并获取解密后数据长度
-    quint32 ulDataOutLength = this->AESDecryptionString(sOriginData.toLatin1().data(), ulDataInLength, pOutput);
-    // 大于0则解密成功
-    if( ulDataOutLength > 0 )
-    {
-        // 字符串转化为QString
-        sDecryptData = QString::fromLatin1(pOutput, ulDataOutLength);
-        bRet = true;
-    }
-
-    // 释放内存
-    free(pOutput);
-    pOutput = NULL;
-
-    return bRet;
-}
-
-quint32 CAES::AESEncryption(char *pucOriginData, char *pucEncryptData, char *pucKey, AESKeyType emKeyType)
-{
-    Q_D(CAES);
-    // 若设置的密钥类型错误,运行会出错,所以直接返回错误
-    if( !d->checkAESType(d->m_emKeyType) )
-    {
-        return -1;
-    }
-
-    // 如果pucKey不为空,则设置密钥信息
-    if( pucKey )
-    {
-        setKey(pucKey, emKeyType);
-    }
-    // 重置状态矩阵数据
-    memset(d->m_pucStateMatrix, 0, SIZE_STATE_MATRIX*sizeof(quint8));
-
-    // 对状态矩阵赋原始值
-    for( int i = 0; i < (ROW_STATE_MATRIX * d->m_lBlockSize); ++i )
-    {
-        d->m_pucStateMatrix[COLUMN_STATE_MATRIX*(i%4) + i/4] = (quint8)pucOriginData[i];
-    }
-
-    // 密钥轮加函数0轮
-    d->keyAddRound(0);
-
-    for( int round = 1; round <= (d->m_lRoundNumber - 1); ++round )
-    {
-        // 字节代换
-        d->byteSubstitute();
-        // 行移位
-        d->rowShift();
-        // 列混淆
-        d->columnMix();
-        // 密钥轮加
-        d->keyAddRound(round);
-    }
-    // 字节代换
-    d->byteSubstitute();
-    // 行移位
-    d->rowShift();
-    // 密钥轮加
-    d->keyAddRound(d->m_lRoundNumber);
-
-    // 获取加密后信息
-    for( int i = 0; i < (ROW_STATE_MATRIX * d->m_lBlockSize); ++i )
-    {
-        pucEncryptData[i] = (char)d->m_pucStateMatrix[COLUMN_STATE_MATRIX*(i%4) + (i/4)];
-    }
-
-    // 返回加密信息长度
-    return strlen(pucEncryptData);
-}
-
-quint32 CAES::AESDecryption(char *pucOriginData, char *pucDecryptData, char *pucKey, AESKeyType emKeyType)
-{
-    Q_D(CAES);
-    // 若设置的密钥类型错误,运行会出错,所以直接返回错误
-    if( !d->checkAESType(d->m_emKeyType) )
-    {
-        return -1;
-    }
-
-    // 如果pucKey不为空,则设置密钥信息
-    if( pucKey )
-    {
-        setKey(pucKey, emKeyType);
-    }
-    // 重置状态矩阵数据
-    memset(d->m_pucStateMatrix, 0, SIZE_STATE_MATRIX*sizeof(quint8));
-
-    // 对状态矩阵赋原始值
-    for( int i = 0; i < (ROW_STATE_MATRIX * d->m_lBlockSize); ++i )
-    {
-        d->m_pucStateMatrix[COLUMN_STATE_MATRIX*(i%4) + i/4] = (quint8)pucOriginData[i];
-    }
-
-    // 密钥轮加
-    d->keyAddRound(d->m_lRoundNumber);
-
-    for( int round = d->m_lRoundNumber - 1; round >= 1; --round )
-    {
-        // 行移位逆变换
-        d->rowInvertShift();
-        // 字节代换逆变换
-        d->byteInvertSubstitube();
-        // 密钥轮加
-        d->keyAddRound(round);
-        // 列混淆逆变换
-        d->columnInvertMix();
-    }
-    // 行移位逆变换
-    d->rowInvertShift();
-    // 字节代换逆变换
-    d->byteInvertSubstitube();
-    // 密钥轮加
-    d->keyAddRound(0);
-
-    // 获取解密后信息
-    for( int i = 0; i < (ROW_STATE_MATRIX * d->m_lBlockSize); ++i )
-    {
-        pucDecryptData[i] = (char)d->m_pucStateMatrix[COLUMN_STATE_MATRIX*(i%4) + (i/4)];
-    }
-
-    // 返回解密信息长度
-    return strlen(pucDecryptData);
 }
 
 bool CAES::setKey(char *pucKey, AESKeyType emKeyType)
@@ -425,30 +266,106 @@ bool CAES::setKey(char *pucKey, AESKeyType emKeyType)
 CAESPrivate::CAESPrivate()
 {
     q_ptr = NULL;
-    m_pucKey = (quint8*)calloc(MAX_KEY_SIZE, sizeof(quint8));
-    m_pucKeySchedule = (quint8*)calloc(SIZE_KEY_SCHEDULE, sizeof(quint8));
-    m_pucStateMatrix = (quint8*)calloc(SIZE_STATE_MATRIX, sizeof(quint8));
+
+    memset(m_aucKey, 0, MAX_KEY_SIZE*sizeof(quint8));
+    memset(m_aucKeySchedule, 0, SIZE_KEY_SCHEDULE*sizeof(quint8));
+    memset(m_aucStateMatrix, 0, SIZE_STATE_MATRIX*sizeof(quint8));
 }
 
 CAESPrivate::~CAESPrivate()
 {
-    if( NULL != m_pucKey )
+
+}
+
+
+quint32 CAESPrivate::AESEncryption(quint8 *pucOriginData, quint8 *pucEncryptData)
+{
+    // 若设置的密钥类型错误,运行会出错,所以直接返回错误
+    if( !this->checkAESType(this->m_emKeyType) )
     {
-        free(m_pucKey);
-        m_pucKey = NULL;
+        return -1;
     }
 
-    if( NULL != m_pucKeySchedule )
+    // 重置状态矩阵数据
+    memset(&m_aucStateMatrix[0][0], 0, SIZE_STATE_MATRIX*sizeof(quint8));
+
+    // 对状态矩阵赋原始值
+    for( int i = 0; i < (4 * m_lBlockSize); ++i )
     {
-        free(m_pucKeySchedule);
-        m_pucKeySchedule = NULL;
+        m_aucStateMatrix[i % 4][i / 4] = (quint8)pucOriginData[i];
     }
 
-    if( NULL != m_pucStateMatrix )
+    // 密钥轮加函数0轮
+    keyAddRound(0);
+
+    for( int round = 1; round <= (m_lRoundNumber - 1); ++round )
     {
-        free(m_pucStateMatrix);
-        m_pucStateMatrix = NULL;
+        // 字节代换
+        byteSubstitute();
+        // 行移位
+        rowShift();
+        // 列混淆
+        columnMix();
+        // 密钥轮加
+        keyAddRound(round);
     }
+    // 字节代换
+    byteSubstitute();
+    // 行移位
+    rowShift();
+    // 密钥轮加
+    keyAddRound(m_lRoundNumber);
+
+    // 获取加密后信息
+    for( int i = 0; i < (ROW_STATE_MATRIX * this->m_lBlockSize); ++i )
+    {
+        pucEncryptData[i] = m_aucStateMatrix[i % 4][i / 4];
+    }
+
+    // 返回加密信息长度
+    return strlen((char*)pucEncryptData);
+}
+
+quint32 CAESPrivate::AESDecryption(quint8 *pucOriginData, quint8 *pucDecryptData)
+{
+    // 重置状态矩阵数据
+    memset(&m_aucStateMatrix[0][0], 0, SIZE_STATE_MATRIX*sizeof(quint8));
+
+    // 对状态矩阵赋原始值
+    for (int i = 0; i < (4 * m_lBlockSize); ++i )
+    {
+        m_aucStateMatrix[i % 4][ i / 4] = pucOriginData[i];
+    }
+
+    // 密钥轮加
+    keyAddRound(m_lRoundNumber);
+
+    for (int round = m_lRoundNumber-1; round >= 1; --round)
+    {
+        // 行移位逆变换
+        rowInvertShift();
+        // 字节代换逆变换
+        byteInvertSubstitube();
+        // 密钥轮加
+        keyAddRound(round);
+        // 列混淆逆变换
+        columnInvertMix();
+    }
+    // 行移位逆变换
+    rowInvertShift();
+    // 字节代换逆变换
+    byteInvertSubstitube();
+    // 密钥轮加
+    keyAddRound(0);
+
+    // 获取解密后信息
+    for (int i = 0; i < (4 * m_lBlockSize); i++)
+    {
+        pucDecryptData[i] =  m_aucStateMatrix[i % 4][ i / 4];
+    }
+
+    // 返回解密信息长度
+    return strlen((char*)pucDecryptData);
 }
 
 bool CAESPrivate::checkAESType(AESKeyType emKeyType)
@@ -485,7 +402,7 @@ bool CAESPrivate::runKeyExpansion(AESKeyType emKeyType, quint8 *pucKey)
         return bRet;
     }
 
-    memcpy(m_pucKey, pucKey, emKeyType);
+    memcpy(m_aucKey, pucKey, emKeyType);
     expandKey();
 
     return true;
@@ -531,69 +448,58 @@ bool CAESPrivate::setKeyLength(AESKeyType emKeyType)
 
 void CAESPrivate::expandKey()
 {
-    memset(m_pucKeySchedule, 0, SIZE_KEY_SCHEDULE*sizeof(quint8));
-    for( int row = 0; row < m_lKeySize; ++row)  //lKeySize=4,6,8得到初始密码
+    memset(m_aucKeySchedule, 0, SIZE_KEY_SCHEDULE*sizeof(quint8));
+    for( int row=0; row < m_lKeySize; ++row )       //拷贝seed 密钥
     {
-        m_pucKeySchedule[4*row+0] = m_pucKey[4*row+0];
-        m_pucKeySchedule[4*row+1] = m_pucKey[4*row+1];
-        m_pucKeySchedule[4*row+2] = m_pucKey[4*row+2];
-        m_pucKeySchedule[4*row+3] = m_pucKey[4*row+3];
+        m_aucKeySchedule[4*row+0] =  m_aucKey[4*row];
+        m_aucKeySchedule[4*row+1] =  m_aucKey[4*row+1];
+        m_aucKeySchedule[4*row+2] =  m_aucKey[4*row+2];
+        m_aucKeySchedule[4*row+3] =  m_aucKey[4*row+3];
     }
 
-    quint8 *pucTemp = (quint8*)malloc(COLUMN_STATE_MATRIX*sizeof(quint8));
-    quint8 *pucResultSub = (quint8*)malloc(COLUMN_STATE_MATRIX*sizeof(quint8));
-    quint8 *pucResultShift = (quint8*)malloc(COLUMN_STATE_MATRIX*sizeof(quint8));
-    //产生密匙顺序表
-    for( int row = m_lKeySize; row < m_lBlockSize * (m_lRoundNumber+1); ++row)
+    quint8* pucTemp = new quint8[4];
+    quint8* pucOutput = new quint8[4];
+    for( int row = m_lKeySize; row < 4*(m_lRoundNumber+1); ++row )
     {
-        pucTemp[0] = m_pucKeySchedule[4*(row-1)+0];
-        pucTemp[1] = m_pucKeySchedule[4*(row-1)+1];
-        pucTemp[2] = m_pucKeySchedule[4*(row-1)+2];
-        pucTemp[3] = m_pucKeySchedule[4*(row-1)+3];
-
-        if( row % m_lKeySize )
+        pucTemp[0]=m_aucKeySchedule[4*row-4];       //当前列的前一列
+        pucTemp[1]=m_aucKeySchedule[4*row-3];
+        pucTemp[2]=m_aucKeySchedule[4*row-2];
+        pucTemp[3]=m_aucKeySchedule[4*row-1];
+        if(row%m_lKeySize==0)                       //逢nk时，对当前列的前一列作特殊处理
         {
-            //keyShift接受4字节数组并将它们向左旋转位移1位. 由于轮回次序表w[]有四列,所以RotWord会将一行w[]向左旋转位移
-            keyShift(pucTemp, pucResultShift);
-            //keySubstitute使用置换表Sbox,针对密匙次序表w[]的给定行执行逐字节替换
-            keySubstitute(pucResultShift, pucResultSub);
-            memcpy(pucTemp, pucResultSub, 4*sizeof(quint8));
-
-            pucTemp[0] = (quint8)( (qint32)pucTemp[0] ^ (qint32) m_aucConstant[4*(row/m_lKeySize)+0] );
-            pucTemp[1] = (quint8)( (qint32)pucTemp[1] ^ (qint32) m_aucConstant[4*(row/m_lKeySize)+1] );
-            pucTemp[2] = (quint8)( (qint32)pucTemp[2] ^ (qint32) m_aucConstant[4*(row/m_lKeySize)+2] );
-            pucTemp[3] = (quint8)( (qint32)pucTemp[3] ^ (qint32) m_aucConstant[4*(row/m_lKeySize)+3] );
+            keyShift(pucTemp, pucOutput);
+            keySubstitute(pucOutput, pucTemp);      //先移位，再代换，最后和轮常量异或
+            pucTemp[0] = (quint8)( (int)pucTemp[0] ^ (int) m_aucConstant[4*(row/m_lKeySize)+0] );
+            pucTemp[1] = (quint8)( (int)pucTemp[1] ^ (int) m_aucConstant[4*(row/m_lKeySize)+1] );
+            pucTemp[2] = (quint8)( (int)pucTemp[2] ^ (int) m_aucConstant[4*(row/m_lKeySize)+2] );
+            pucTemp[3] = (quint8)( (int)pucTemp[3] ^ (int) m_aucConstant[4*(row/m_lKeySize)+3] );
         }
-        else if( m_lKeySize > 6 && ( 4 == row % m_lKeySize ) )
+        else if ( m_lKeySize > 6 && (row % m_lKeySize == 4) )
         {
-            keySubstitute(pucTemp, pucResultSub);
-            memcpy(pucTemp, pucResultSub, 4*sizeof(quint8));
+            keySubstitute(pucTemp, pucOutput);
+            memcpy(pucTemp, pucOutput, 4);
         }
 
-        // m_pucKeySchedule[row] = m_pucKeySchedule[row-m_lKeySize] xor pucTemp
-        m_pucKeySchedule[4*row+0] = (quint8) ( (qint32) m_pucKeySchedule[4*(row-m_lKeySize)+0] ^ (qint32)pucTemp[0] );
-        m_pucKeySchedule[4*row+1] = (quint8) ( (qint32) m_pucKeySchedule[4*(row-m_lKeySize)+1] ^ (qint32)pucTemp[1] );
-        m_pucKeySchedule[4*row+2] = (quint8) ( (qint32) m_pucKeySchedule[4*(row-m_lKeySize)+2] ^ (qint32)pucTemp[2] );
-        m_pucKeySchedule[4*row+3] = (quint8) ( (qint32) m_pucKeySchedule[4*(row-m_lKeySize)+3] ^ (qint32)pucTemp[3] );
-    }
+        // m_aucKeySchedule[row] = m_aucKeySchedule[row-m_lKeySize] xor pucTemp
+        m_aucKeySchedule[4*row+0] = (quint8) ( (int) m_aucKeySchedule[4*(row-m_lKeySize)+0] ^ (int)pucTemp[0] );
+        m_aucKeySchedule[4*row+1] = (quint8) ( (int) m_aucKeySchedule[4*(row-m_lKeySize)+1] ^ (int)pucTemp[1] );
+        m_aucKeySchedule[4*row+2] = (quint8) ( (int) m_aucKeySchedule[4*(row-m_lKeySize)+2] ^ (int)pucTemp[2] );
+        m_aucKeySchedule[4*row+3] = (quint8) ( (int) m_aucKeySchedule[4*(row-m_lKeySize)+3] ^ (int)pucTemp[3] );
+    }  // for loop
 
-    free(pucTemp);
+    delete pucTemp;
     pucTemp = NULL;
 
-    free(pucResultSub);
-    pucResultSub = NULL;
-
-    free(pucResultShift);
-    pucResultShift = NULL;
+    delete pucOutput;
+    pucOutput = NULL;
 }
 
 void CAESPrivate::keySubstitute(quint8 *pucInput, quint8 *pucOutput)
 {
-    pucOutput[0] =  m_aucSBox[ 16*(pucInput[0] >> 4)+ (pucInput[0] & 0x0f) ];
-    pucOutput[1] =  m_aucSBox[ 16*(pucInput[1] >> 4)+ (pucInput[1] & 0x0f) ];
-    pucOutput[2] =  m_aucSBox[ 16*(pucInput[2] >> 4)+ (pucInput[2] & 0x0f) ];
-    pucOutput[3] =  m_aucSBox[ 16*(pucInput[3] >> 4)+ (pucInput[3] & 0x0f) ];
-}
+    for(int i = 0; i < 4; ++i)
+    {
+        pucOutput[i] = m_aucSBox[16*(pucInput[i] >> 4)+(pucInput[i] & 0x0f)];  //实际上也可以写成AesSbox[[i]];因为两者相等
+    }}
 
 void CAESPrivate::keyShift(quint8 *pucInput, quint8 *pucOutput)
 {
@@ -605,194 +511,194 @@ void CAESPrivate::keyShift(quint8 *pucInput, quint8 *pucOutput)
 
 void CAESPrivate::keyAddRound(quint32 lRound)
 {
-    for( int row = 0; row < ROW_STATE_MATRIX; ++row )
+    //因为密钥w是一列一列排列的,即 k0 k4 k8  k12
+    //						  k1 k5 k9  k13
+    //						  k2 k6 k10 k14
+    //						  k3 k7 k11 k15
+    for( int column = 0; column < COLUMN_STATE_MATRIX; ++column )
     {
-        for( int column = 0; column < COLUMN_STATE_MATRIX; ++column )
+        for( int row = 0; row < ROW_STATE_MATRIX; ++row )
         {
-            //aucKeySchedule:    4*x+y
-            m_pucStateMatrix[COLUMN_STATE_MATRIX*row + column] =
-                    (quint8)((qint32)m_pucStateMatrix[COLUMN_STATE_MATRIX*row + column] ^
-                             (qint32)m_pucKeySchedule[ROW_STATE_MATRIX*((lRound*ROW_STATE_MATRIX)+column)+row]);
+            // 所以i行j列的下标是4*((round*4)+column)+i即16*round+4*column+row
+            m_aucStateMatrix[row][column]=(quint8)((int)m_aucStateMatrix[row][column]^(int)m_aucKeySchedule[4*((lRound*4)+column)+row]);
         }
     }
 }
 
 void CAESPrivate::byteSubstitute()
 {
-    for( int row = 0; row < ROW_STATE_MATRIX; ++row )
+    for( int column = 0; column < COLUMN_STATE_MATRIX; ++column )
     {
-        for( int column = 0; column < COLUMN_STATE_MATRIX; ++column )
+        for( int row = 0; row < ROW_STATE_MATRIX; ++row )
         {
             // S盒生成状态矩阵
-            m_pucStateMatrix[COLUMN_STATE_MATRIX*row + column] =
-                    m_aucSBox[ 16*( m_pucStateMatrix[COLUMN_STATE_MATRIX*row + column] >> 4) +
-                                  ( m_pucStateMatrix[COLUMN_STATE_MATRIX*row + column] & 0x0f) ];
+            m_aucStateMatrix[row][column] = m_aucSBox[m_aucStateMatrix[row][column]];
+            // 因为 16*(m_aucStateMatrix[row][column]>>4)+m_aucStateMatrix[row][column]&0x0f=m_aucStateMatrix[row][column]
         }
     }
 }
 
 void CAESPrivate::byteInvertSubstitube()
 {
-    for( int row = 0; row < ROW_STATE_MATRIX; ++row )
+    for( int column = 0; column < COLUMN_STATE_MATRIX; ++column )
     {
-        for( int column = 0; column < COLUMN_STATE_MATRIX; ++column )
+        for( int row = 0; row < ROW_STATE_MATRIX; ++row )
         {
             // 逆S盒生成状态矩阵
-            m_pucStateMatrix[COLUMN_STATE_MATRIX*row + column] =
-                    m_aucISBox[ 16*( m_pucStateMatrix[COLUMN_STATE_MATRIX*row + column] >> 4) +
-                                   ( m_pucStateMatrix[COLUMN_STATE_MATRIX*row + column] & 0x0f) ];
+            m_aucStateMatrix[row][column] = m_aucISBox[m_aucStateMatrix[row][column]];
         }
     }
 }
 
 void CAESPrivate::rowShift()
 {
-    quint8 *pucTemp = (quint8*)malloc(SIZE_STATE_MATRIX*sizeof(quint8));
+    quint8 *pucTemp = new quint8[SIZE_STATE_MATRIX];                                        //Page105
 
     //拷贝状态矩阵到pucTemp
-    for( int row = 0; row < ROW_STATE_MATRIX; ++row )
+    for( int column = 0; column < COLUMN_STATE_MATRIX; ++column )
     {
-        for( int column = 0; column < COLUMN_STATE_MATRIX; ++column )
+        for( int row = 0; row < ROW_STATE_MATRIX; ++row )
         {
-            pucTemp[COLUMN_STATE_MATRIX*row + column] =
-                    m_pucStateMatrix[COLUMN_STATE_MATRIX*row + column];
+            pucTemp[4*row+column] = m_aucStateMatrix[row][column];
         }
     }
 
     // 行移位
     // 转换pucTemp到状态矩阵
-    for( int row = 0; row < ROW_STATE_MATRIX; ++row )
+    for( int row = 1; row < ROW_STATE_MATRIX; ++row )
     {
-        for( int column =0; column < COLUMN_STATE_MATRIX; ++column )
+        for( int column = 0; column < COLUMN_STATE_MATRIX; ++column )
         {
-            m_pucStateMatrix[COLUMN_STATE_MATRIX*row + column] =
-                    pucTemp[COLUMN_STATE_MATRIX*row + (column+row) % m_lBlockSize];
+            //if(row==1)m_aucStateMatrix[row][column]=pucTemp[4*row+(column+1)%4];					//第一行左移1位
+            //else if(row==2)m_aucStateMatrix[row][column]=pucTemp[4*row+(column+2)%4];				//第二行左移2位
+            //else if(row==3)m_aucStateMatrix[row][column]=pucTemp[4*row+(column+3)%4];				//第三行左移3位
+            m_aucStateMatrix[row][column] = pucTemp[4*row+(column+row)%4];
         }
     }
 
-    free(pucTemp);
+    delete pucTemp;
     pucTemp = NULL;
 }
 
 void CAESPrivate::rowInvertShift()
 {
-    quint8 *pucTemp = (quint8*)malloc(SIZE_STATE_MATRIX*sizeof(quint8));
+    quint8 *pucTemp = new quint8[SIZE_STATE_MATRIX];
 
     // 拷贝状态矩阵到pucTemp
-    for( int row = 0; row < ROW_STATE_MATRIX; ++row )
+    for( int column = 0; column < COLUMN_STATE_MATRIX; ++column )
     {
-        for( int column = 0; column < COLUMN_STATE_MATRIX; ++column )
+        for( int row = 0; row < ROW_STATE_MATRIX; ++row )
         {
-            pucTemp[COLUMN_STATE_MATRIX*row + column] =
-                    m_pucStateMatrix[COLUMN_STATE_MATRIX*row + column];
+            pucTemp[4*row+column] = m_aucStateMatrix[row][column];
         }
     }
 
     // 行移位逆变换
     // 转换pucTemp到状态矩阵
-    for( int row = 0; row < ROW_STATE_MATRIX; ++row )
+    for( int row = 1; row < ROW_STATE_MATRIX; ++row )
     {
-        for( int column =0; column < COLUMN_STATE_MATRIX; ++column )
+        for( int column = 0; column < COLUMN_STATE_MATRIX; ++column )
         {
-            m_pucStateMatrix[COLUMN_STATE_MATRIX*row + (column+row) % m_lBlockSize] =
-                                        pucTemp[COLUMN_STATE_MATRIX*row + column];
+            //if(row==1)m_aucStateMatrix[row][column]=pucTemp[4*row+(column+3)%4];			//第一行右移1位 column-1+4=column+3
+            //else if(row==2)m_aucStateMatrix[row][column]=pucTemp[4*row+(column+2)%4];		//第二行右移2位 column-2+4=column+2
+            //else if(row==3)m_aucStateMatrix[row][column]=pucTemp[4*row+(column+1)%4];		//第三行右移3位 column-3+4=column+2
+            m_aucStateMatrix[row][column] = pucTemp[4*row+(column-row+4)%4];
         }
     }
 
-    free(pucTemp);
+    delete pucTemp;
     pucTemp = NULL;
 }
 
 void CAESPrivate::columnMix()
 {
-    quint8 *pucTemp = (quint8*)malloc(SIZE_STATE_MATRIX*sizeof(quint8));
+    quint8 *pucTemp = new quint8[SIZE_STATE_MATRIX];
 
     // 拷贝状态矩阵到pucTemp
-    for( int row = 0; row < ROW_STATE_MATRIX; ++row )
+    for( int column = 0; column < COLUMN_STATE_MATRIX; ++column )
     {
-        for( int column = 0; column < COLUMN_STATE_MATRIX; ++column )
+        for( int row = 0; row < ROW_STATE_MATRIX; ++row )
         {
-            pucTemp[COLUMN_STATE_MATRIX*row + column] = m_pucStateMatrix[COLUMN_STATE_MATRIX*row + column];
+            pucTemp[4*row+column]=m_aucStateMatrix[row][column];
         }
     }
 
     // 列混淆
+    //  2 3 1 1  列混淆矩阵
+    //  1 2 3 1
+    //  1 1 2 3
+    //  3 1 1 2
     // 转换pucTemp到状态矩阵
     for( int column = 0; column < COLUMN_STATE_MATRIX; ++column )
     {
-        m_pucStateMatrix[column] =
-                        (quint8)( (qint32)constantMixFunc02(pucTemp[column]) ^
-                                  (qint32)constantMixFunc03(pucTemp[ROW_STATE_MATRIX*1+column]) ^
-                                  (qint32)constantMixFunc01(pucTemp[ROW_STATE_MATRIX*2+column]) ^
-                                  (qint32)constantMixFunc01(pucTemp[ROW_STATE_MATRIX*3+column]));
+        m_aucStateMatrix[0][column] = (quint8) ( (int)constantMixFunc02(pucTemp[0+column]) ^
+                                                 (int)constantMixFunc03(pucTemp[4*1+column]) ^
+                                                 (int)constantMixFunc01(pucTemp[4*2+column]) ^
+                                                 (int)constantMixFunc01(pucTemp[4*3+column]) );
 
-        m_pucStateMatrix[ROW_STATE_MATRIX*1 + column] =
-                        (quint8)( (qint32)constantMixFunc01(pucTemp[column]) ^
-                                  (qint32)constantMixFunc02(pucTemp[ROW_STATE_MATRIX*1+column]) ^
-                                  (qint32)constantMixFunc03(pucTemp[ROW_STATE_MATRIX*2+column]) ^
-                                  (qint32)constantMixFunc01(pucTemp[ROW_STATE_MATRIX*3+column]));
+        m_aucStateMatrix[1][column] = (quint8) ( (int)constantMixFunc01(pucTemp[0+column]) ^
+                                                 (int)constantMixFunc02(pucTemp[4*1+column]) ^
+                                                 (int)constantMixFunc03(pucTemp[4*2+column]) ^
+                                                 (int)constantMixFunc01(pucTemp[4*3+column]) );
 
-        m_pucStateMatrix[ROW_STATE_MATRIX*2 + column] =
-                        (quint8)( (qint32)constantMixFunc01(pucTemp[column]) ^
-                                  (qint32)constantMixFunc01(pucTemp[ROW_STATE_MATRIX*1+column]) ^
-                                  (qint32)constantMixFunc02(pucTemp[ROW_STATE_MATRIX*2+column]) ^
-                                  (qint32)constantMixFunc03(pucTemp[ROW_STATE_MATRIX*3+column]));
+        m_aucStateMatrix[2][column] = (quint8) ( (int)constantMixFunc01(pucTemp[0+column]) ^
+                                                 (int)constantMixFunc01(pucTemp[4*1+column]) ^
+                                                 (int)constantMixFunc02(pucTemp[4*2+column]) ^
+                                                 (int)constantMixFunc03(pucTemp[4*3+column]) );
 
-        m_pucStateMatrix[ROW_STATE_MATRIX*3 + column] =
-                        (quint8)( (qint32)constantMixFunc03(pucTemp[column]) ^
-                                  (qint32)constantMixFunc01(pucTemp[ROW_STATE_MATRIX*1+column]) ^
-                                  (qint32)constantMixFunc01(pucTemp[ROW_STATE_MATRIX*2+column]) ^
-                                  (qint32)constantMixFunc02(pucTemp[ROW_STATE_MATRIX*3+column]));
+        m_aucStateMatrix[3][column] = (quint8) ( (int)constantMixFunc03(pucTemp[0+column]) ^
+                                                 (int)constantMixFunc01(pucTemp[4*1+column]) ^
+                                                 (int)constantMixFunc01(pucTemp[4*2+column]) ^
+                                                 (int)constantMixFunc02(pucTemp[4*3+column]) );
     }
 
-    free(pucTemp);
+    delete pucTemp;
     pucTemp = NULL;
 }
 
 void CAESPrivate::columnInvertMix()
 {
-    quint8 *pucTemp = (quint8*)malloc(SIZE_STATE_MATRIX*sizeof(quint8));
+    quint8 *pucTemp = new quint8[SIZE_STATE_MATRIX];
 
     // 拷贝状态矩阵到pucTemp
     for( int row = 0; row < ROW_STATE_MATRIX; ++row )
     {
         for( int column = 0; column < COLUMN_STATE_MATRIX; ++column )
         {
-            pucTemp[COLUMN_STATE_MATRIX*row + column] =
-                    m_pucStateMatrix[COLUMN_STATE_MATRIX*row + column];
+            pucTemp[4*row+column] =  m_aucStateMatrix[row][column];
         }
     }
 
     // 列混淆
+    // 0e 0b 0d 09   逆变换矩
+    // 09 0e 0b 0d
+    // 0d 09 0e 0b
+    // 0b 0d 09 0e
     // 转换pucTemp到状态矩阵
     for( int column = 0; column < COLUMN_STATE_MATRIX; ++column )
     {
-        m_pucStateMatrix[column] =
-                        (quint8)( (qint32)constantMixFunc0e(pucTemp[column]) ^
-                                  (qint32)constantMixFunc0b(pucTemp[ROW_STATE_MATRIX*1+column]) ^
-                                  (qint32)constantMixFunc0d(pucTemp[ROW_STATE_MATRIX*2+column]) ^
-                                  (qint32)constantMixFunc09(pucTemp[ROW_STATE_MATRIX*3+column]));
+        m_aucStateMatrix[0][column] = (quint8) ( (int)constantMixFunc0e(pucTemp[column]) ^
+                                                 (int)constantMixFunc0b(pucTemp[4+column]) ^
+                                                 (int)constantMixFunc0d(pucTemp[4*2+column]) ^
+                                                 (int)constantMixFunc09(pucTemp[4*3+column]) );
 
-        m_pucStateMatrix[ROW_STATE_MATRIX*1 + column] =
-                        (quint8)( (qint32)constantMixFunc09(pucTemp[column]) ^
-                                  (qint32)constantMixFunc0e(pucTemp[ROW_STATE_MATRIX*1+column]) ^
-                                  (qint32)constantMixFunc0b(pucTemp[ROW_STATE_MATRIX*2+column]) ^
-                                  (qint32)constantMixFunc0d(pucTemp[ROW_STATE_MATRIX*3+column]));
+        m_aucStateMatrix[1][column] = (quint8) ( (int)constantMixFunc09(pucTemp[column]) ^
+                                                 (int)constantMixFunc0e(pucTemp[4+column]) ^
+                                                 (int)constantMixFunc0b(pucTemp[4*2+column]) ^
+                                                 (int)constantMixFunc0d(pucTemp[4*3+column]) );
 
-        m_pucStateMatrix[ROW_STATE_MATRIX*2 + column] =
-                        (quint8)( (qint32)constantMixFunc0d(pucTemp[column]) ^
-                                  (qint32)constantMixFunc09(pucTemp[ROW_STATE_MATRIX*1+column]) ^
-                                  (qint32)constantMixFunc0e(pucTemp[ROW_STATE_MATRIX*2+column]) ^
-                                  (qint32)constantMixFunc0b(pucTemp[ROW_STATE_MATRIX*3+column]));
+        m_aucStateMatrix[2][column] = (quint8) ( (int)constantMixFunc0d(pucTemp[column]) ^
+                                                 (int)constantMixFunc09(pucTemp[4+column]) ^
+                                                 (int)constantMixFunc0e(pucTemp[4*2+column]) ^
+                                                 (int)constantMixFunc0b(pucTemp[4*3+column]) );
 
-        m_pucStateMatrix[ROW_STATE_MATRIX*3 + column] =
-                        (quint8)( (qint32)constantMixFunc0b(pucTemp[column]) ^
-                                  (qint32)constantMixFunc0d(pucTemp[ROW_STATE_MATRIX*1+column]) ^
-                                  (qint32)constantMixFunc09(pucTemp[ROW_STATE_MATRIX*2+column]) ^
-                                  (qint32)constantMixFunc0e(pucTemp[ROW_STATE_MATRIX*3+column]));
+        m_aucStateMatrix[3][column] = (quint8) ( (int)constantMixFunc0b(pucTemp[column]) ^
+                                                 (int)constantMixFunc0d(pucTemp[4+column]) ^
+                                                 (int)constantMixFunc09(pucTemp[4*2+column]) ^
+                                                 (int)constantMixFunc0e(pucTemp[4*3+column]) );
     }
 
-    free(pucTemp);
+    delete pucTemp;
     pucTemp = NULL;
 }
 
@@ -800,43 +706,43 @@ quint8 CAESPrivate::constantMixFunc01(quint8 ucData)
 {
     return ucData;
 }
-
 quint8 CAESPrivate::constantMixFunc02(quint8 ucData)
 {
-    if( (quint8)ucData < 0x80 )
-    {
-        return (quint8)(qint32)(ucData << 1);
-    }
+    if (ucData < 0x80)
+        return (quint8)(int)(ucData <<1);
     else
-    {
-        return (quint8)( (qint32)(ucData << 1) ^ (qint32)(0x1b) );
-    }
+        return (quint8)( (int)(ucData << 1) ^ (int)(0x1b) );
 }
 
 quint8 CAESPrivate::constantMixFunc03(quint8 ucData)
 {
-    return (quint8)( (qint32)constantMixFunc02(ucData) ^ (qint32)ucData );
+    return (quint8) ( (int)constantMixFunc02(ucData) ^ (int)ucData );
 }
 
 quint8 CAESPrivate::constantMixFunc09(quint8 ucData)
 {
-    return (quint8)( (qint32)constantMixFunc02(constantMixFunc02(constantMixFunc02(ucData))) ^
-                            (qint32)ucData );
+    return (quint8)( (int)constantMixFunc02(constantMixFunc02(constantMixFunc02(ucData))) ^
+                     (int)ucData );
 }
 
 quint8 CAESPrivate::constantMixFunc0b(quint8 ucData)
 {
-    return (quint8)( (qint32)constantMixFunc09(ucData) ^ (qint32)constantMixFunc02(ucData));
+    return (quint8)( (int)constantMixFunc02(constantMixFunc02(constantMixFunc02(ucData))) ^
+                     (int)constantMixFunc02(ucData) ^
+                     (int)ucData );
 }
 
 quint8 CAESPrivate::constantMixFunc0d(quint8 ucData)
 {
-    return (quint8)( (qint32)constantMixFunc09(ucData) ^
-                                    (qint32)constantMixFunc02(constantMixFunc02(ucData)));
+    return (quint8)( (int)constantMixFunc02(constantMixFunc02(constantMixFunc02(ucData))) ^
+                     (int)constantMixFunc02(constantMixFunc02(ucData)) ^
+                     (int)(ucData) );
 }
 
 quint8 CAESPrivate::constantMixFunc0e(quint8 ucData)
 {
-    return (quint8)( (qint32)constantMixFunc0d(ucData) ^ (qint32)ucData ^
-                                                        (qint32)constantMixFunc02(ucData));
+    return (quint8)( (int)constantMixFunc02(constantMixFunc02(constantMixFunc02(ucData))) ^
+                     (int)constantMixFunc02(constantMixFunc02(ucData)) ^
+                     (int)constantMixFunc02(ucData) );
 }
+
