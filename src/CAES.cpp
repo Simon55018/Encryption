@@ -21,7 +21,7 @@ CAES::CAES()
     d_ptr->q_ptr = NULL;
 }
 
-CAES::CAES(char *pucKey, AESKeyType emKeyType)
+CAES::CAES(quint8 *pucKey, AESKeyType emKeyType)
     : d_ptr(new CAESPrivate)
 {
     d_ptr->q_ptr = NULL;
@@ -43,8 +43,8 @@ bool CAES::AESEncryptionFile(QFile *pOriginFile, QFile *pEncryptFile)
     }
 
     // 申请内存
-    char *aucInput = (char*)calloc(SIZE_ENCRYPT_MALLOC, sizeof(char));
-    char *aucOutput = (char*)calloc(SIZE_ENCRYPT_MALLOC, sizeof(char));
+    quint8 *aucInput = (quint8*)calloc(SIZE_ENCRYPT_MALLOC, sizeof(quint8));
+    quint8 *aucOutput = (quint8*)calloc(SIZE_ENCRYPT_MALLOC, sizeof(quint8));
 
     // 源文件只读打开,加密文件只写打开并重头开始写入
     if( pOriginFile->open(QIODevice::ReadOnly)
@@ -54,14 +54,14 @@ bool CAES::AESEncryptionFile(QFile *pOriginFile, QFile *pEncryptFile)
         while(!pOriginFile->atEnd())
         {
             // 每次读取16位, 因为加密操作每次只能操作16位
-            pOriginFile->read(aucInput, NUMBER_ENCRYPTION);
-            d->AESEncryption((quint8*)aucInput, (quint8*)aucOutput);
+            pOriginFile->read((char*)aucInput, NUMBER_ENCRYPTION);
+            d->AESEncryption(aucInput, aucOutput);
             // 将加密字符串写入
-            pEncryptFile->write(aucOutput, NUMBER_ENCRYPTION);
+            pEncryptFile->write((char*)aucOutput, NUMBER_ENCRYPTION);
 
             // 重置内存
-            memset(aucInput, 0, SIZE_ENCRYPT_MALLOC*sizeof(char));
-            memset(aucOutput, 0, SIZE_ENCRYPT_MALLOC*sizeof(char));
+            memset(aucInput, 0, SIZE_ENCRYPT_MALLOC*sizeof(quint8));
+            memset(aucOutput, 0, SIZE_ENCRYPT_MALLOC*sizeof(quint8));
         }
     }
 
@@ -99,8 +99,8 @@ bool CAES::AESDecryptionFile(QFile *pOriginFile, QFile *pDecryptFile)
     }
 
     // 申请内存
-    char *aucInput = (char*)calloc(SIZE_DECRYPT_MALLOC, sizeof(char));
-    char *aucOutput = (char*)calloc(SIZE_DECRYPT_MALLOC, sizeof(char));
+    quint8 *aucInput = (quint8*)calloc(SIZE_DECRYPT_MALLOC, sizeof(quint8));
+    quint8 *aucOutput = (quint8*)calloc(SIZE_DECRYPT_MALLOC, sizeof(quint8));
 
     // 源文件只读打开,解密文件只写打开并重头开始写入
     if( pOriginFile->open(QIODevice::ReadOnly)
@@ -110,14 +110,14 @@ bool CAES::AESDecryptionFile(QFile *pOriginFile, QFile *pDecryptFile)
         while(!pOriginFile->atEnd())
         {
             // 每次读取16位, 因为解密操作每次只能操作16位
-            pOriginFile->read(aucInput, NUMBER_DECRYPTION);
-            d->AESDecryption((quint8*)aucInput, (quint8*)aucOutput);
+            pOriginFile->read((char*)aucInput, NUMBER_DECRYPTION);
+            d->AESDecryption(aucInput, aucOutput);
             // 将解密字符串写入
-            pDecryptFile->write(aucOutput, NUMBER_ENCRYPTION);
+            pDecryptFile->write((char*)aucOutput, NUMBER_ENCRYPTION);
 
             // 重置内存
-            memset(aucInput, 0, SIZE_DECRYPT_MALLOC*sizeof(char));
-            memset(aucOutput, 0, SIZE_DECRYPT_MALLOC*sizeof(char));
+            memset(aucInput, 0, SIZE_DECRYPT_MALLOC*sizeof(quint8));
+            memset(aucOutput, 0, SIZE_DECRYPT_MALLOC*sizeof(quint8));
         }
     }
 
@@ -253,12 +253,12 @@ quint32 CAES::AESDecryptionString(void *pOriginData, quint32 ulDataInLength, voi
     return (ulDataOutLength-ulExtraBytes);
 }
 
-bool CAES::setKey(char *pucKey, AESKeyType emKeyType)
+bool CAES::setKey(quint8 *pucKey, AESKeyType emKeyType)
 {
     Q_D(CAES);
     d->m_emKeyType = emKeyType;
     // 密钥初始化
-    bool bRet = d->runKeyExpansion(emKeyType, (quint8*)pucKey);
+    bool bRet = d->runKeyExpansion(emKeyType, pucKey);
 
     return bRet;
 }
@@ -278,14 +278,8 @@ CAESPrivate::~CAESPrivate()
 }
 
 
-quint32 CAESPrivate::AESEncryption(quint8 *pucOriginData, quint8 *pucEncryptData)
+void CAESPrivate::AESEncryption(quint8 *pucOriginData, quint8 *pucEncryptData)
 {
-    // 若设置的密钥类型错误,运行会出错,所以直接返回错误
-    if( !this->checkAESType(this->m_emKeyType) )
-    {
-        return -1;
-    }
-
     // 重置状态矩阵数据
     memset(&m_aucStateMatrix[0][0], 0, SIZE_STATE_MATRIX*sizeof(quint8));
 
@@ -321,12 +315,9 @@ quint32 CAESPrivate::AESEncryption(quint8 *pucOriginData, quint8 *pucEncryptData
     {
         pucEncryptData[i] = m_aucStateMatrix[i % 4][i / 4];
     }
-
-    // 返回加密信息长度
-    return strlen((char*)pucEncryptData);
 }
 
-quint32 CAESPrivate::AESDecryption(quint8 *pucOriginData, quint8 *pucDecryptData)
+void CAESPrivate::AESDecryption(quint8 *pucOriginData, quint8 *pucDecryptData)
 {
     // 重置状态矩阵数据
     memset(&m_aucStateMatrix[0][0], 0, SIZE_STATE_MATRIX*sizeof(quint8));
@@ -363,9 +354,6 @@ quint32 CAESPrivate::AESDecryption(quint8 *pucOriginData, quint8 *pucDecryptData
     {
         pucDecryptData[i] =  m_aucStateMatrix[i % 4][ i / 4];
     }
-
-    // 返回解密信息长度
-    return strlen((char*)pucDecryptData);
 }
 
 bool CAESPrivate::checkAESType(AESKeyType emKeyType)

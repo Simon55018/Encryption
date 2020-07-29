@@ -18,7 +18,7 @@ public:
      * \param emKeyType         [in]        AES密钥类型
      * \return 加密字符串长度, 等于-1则失败
      */
-    quint32 AESEncryption(quint8 *pucOriginData, quint8 *pucEncryptData);
+    void AESEncryption(quint8 *pucOriginData, quint8 *pucEncryptData);
     /*!
      * \brief AESDecryption     AES解密(每次只能解密16bit)
      * \param pucOriginData     [in]        源字符串
@@ -27,7 +27,7 @@ public:
      * \param emKeyType         [in]        AES密钥类型
      * \return 解密字符串长度, 等于-1则失败
      */
-    quint32 AESDecryption(quint8 *pucOriginData, quint8 *pucDecryptData);
+    void AESDecryption(quint8 *pucOriginData, quint8 *pucDecryptData);
 
     /*!
      * \brief checkAESType  检查AES密钥类型

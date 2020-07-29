@@ -20,7 +20,9 @@ class CAES
 
 public:
     CAES();
-    explicit CAES(char *pucKey, AESKeyType emKeyType = EM_AES_128);
+    // AES密钥(需要用根据密钥类型,申请空间,即quint8[emKeyType]大小;
+    // 不能用QString转QByteArray转char*的方式,因为无法在后面补上'/0')
+    explicit CAES(quint8 *pucKey, AESKeyType emKeyType = EM_AES_128);
     ~CAES();
 
     /*!
@@ -71,11 +73,12 @@ public:
 
     /*!
      * \brief setKey        设置密钥
-     * \param pucKey        [in]        AES密钥
+     * \param pucKey        [in]        AES密钥(需要用根据密钥类型,申请空间,即quint8[emKeyType]大小;
+     *                                         不能用QString转QByteArray转char*的方式,因为无法在后面补上'/0')
      * \param emKeyType     [in]        AES密钥类型
      * \return
      */
-    bool setKey(char *pucKey, AESKeyType emKeyType = EM_AES_128);
+    bool setKey(quint8 *pucKey, AESKeyType emKeyType = EM_AES_128);
 
 private:
     QScopedPointer<CAESPrivate>     d_ptr;
