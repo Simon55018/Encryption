@@ -55,21 +55,37 @@ public:
     bool AESDecryptionFile(QString sOriginFileName, QString sDecryptFileName);
 
     /*!
-     * \brief AESEncryptionString AES加密字符串
-     * \param pOriginData         [in]      源字符串指针
+     * \brief AESEncryptionString AES加密
+     * \param pOriginData         [in]      源数据指针
      * \param ulDataInLength      [in]      输入数据长度
-     * \param pEncryptData        [in&out]  加密后字符串指针
-     * \return 加密后字符串长度 大于0则成功 等于-1则失败
+     * \param pEncryptData        [in&out]  加密后数据指针
+     * \return 加密后数据长度 大于0则成功 等于-1则失败
      */
-    quint32 AESEncryptionString(void *pOriginData, quint32 ulDataInLength, void *pEncryptData);
+    quint32 AESEncryption(const void *pOriginData, quint32 ulDataInLength, void *pEncryptData);
     /*!
-     * \brief AESDecryptionString AES解密字符串
-     * \param pOriginData         [in]      源字符串指针
+     * \brief AESDecryptionString AES解密
+     * \param pOriginData         [in]      源数据指针
      * \param ulDataInLength      [in]      输入数据长度
-     * \param pDecryptData        [in&out]  解密后字符串指针
-     * \return 解密后字符串长度 大于0则成功 等于-1则失败
+     * \param pDecryptData        [in&out]  解密后数据指针
+     * \return 解密后数据长度 大于0则成功 等于-1则失败
      */
-    quint32 AESDecryptionString(void *pOriginData, quint32 ulDataInLength, void *pDecryptData);
+    quint32 AESDecryption(const void *pOriginData, quint32 ulDataInLength, void *pDecryptData);
+
+    ///(由于加密过程可能出现'/0',所以用QByteArray, 而不用QString)
+    /*!
+     * \brief AESEncryptionString AES加密字节数组
+     * \param baOriginData         [in]      源字节数组
+     * \param baEncryptData        [in&out]  加密后字节数组
+     * \return 成功/失败
+     */
+    bool AESEncryptionByteArray(const QByteArray baOriginData, QByteArray &baEncryptData);
+    /*!
+     * \brief AESDecryptionString AES加密字节数组
+     * \param baOriginData         [in]      源字节数组
+     * \param baDecryptData        [in&out]  解密后字节数组
+     * \return 成功/失败
+     */
+    bool AESDecryptionByteArray(const QByteArray baOriginData, QByteArray &baDecryptData);
 
     /*!
      * \brief setKey        设置密钥

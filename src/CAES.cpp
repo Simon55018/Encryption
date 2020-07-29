@@ -145,7 +145,7 @@ bool CAES::AESDecryptionFile(QString sOriginFileName, QString sDecryptFileName)
     return this->AESDecryptionFile(&fileOrigin, &fileDecrypt);
 }
 
-quint32 CAES::AESEncryptionString(void *pOriginData, quint32 ulDataInLength, void *pEncryptData)
+quint32 CAES::AESEncryption(const void *pOriginData, quint32 ulDataInLength, void *pEncryptData)
 {
     Q_D(CAES);
     // 若设置的密钥类型错误,运行会出错,所以直接返回错误
@@ -209,7 +209,7 @@ quint32 CAES::AESEncryptionString(void *pOriginData, quint32 ulDataInLength, voi
     return ulDataOutLength;
 }
 
-quint32 CAES::AESDecryptionString(void *pOriginData, quint32 ulDataInLength, void *pDecryptData)
+quint32 CAES::AESDecryption(const void *pOriginData, quint32 ulDataInLength, void *pDecryptData)
 {
     Q_D(CAES);
     // 若设置的密钥类型错误,运行会出错,所以直接返回错误
@@ -251,6 +251,40 @@ quint32 CAES::AESDecryptionString(void *pOriginData, quint32 ulDataInLength, voi
 
     // 返回正确数据长度
     return (ulDataOutLength-ulExtraBytes);
+}
+
+bool CAES::AESEncryptionByteArray(const QByteArray baOriginData, QByteArray &baEncryptData)
+{
+    char *pucEncrypt = (char*)calloc(baOriginData.length() + 32, sizeof(char));
+    qint32 length = AESEncryption(baOriginData.data(), baOriginData.length(), pucEncrypt);
+    if( length < 0 )
+    {
+        return false;
+    }
+
+    baEncryptData.append(QByteArray::fromRawData(pucEncrypt, length));
+
+    free(pucEncrypt);
+    pucEncrypt = NULL;
+
+    return true;
+}
+
+bool CAES::AESDecryptionByteArray(const QByteArray baOriginData, QByteArray &baDecryptData)
+{
+    char *pucDecrypt = (char*)calloc(baOriginData.length(), sizeof(char));
+    qint32 length = AESDecryption(baOriginData.data(), baOriginData.length(), pucDecrypt);
+    if( length < 0 )
+    {
+        return false;
+    }
+
+    baDecryptData.append(QByteArray::fromRawData(pucDecrypt, length));
+
+    free(pucDecrypt);
+    pucDecrypt = NULL;
+
+    return true;
 }
 
 bool CAES::setKey(quint8 *pucKey, AESKeyType emKeyType)
