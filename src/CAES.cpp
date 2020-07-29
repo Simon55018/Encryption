@@ -57,7 +57,7 @@ bool CAES::AESEncryptionFile(QFile *pOriginFile, QFile *pEncryptFile)
             pOriginFile->read((char*)aucInput, NUMBER_ENCRYPTION);
             d->AESEncryption(aucInput, aucOutput);
             // 将加密字符串写入
-            pEncryptFile->write((char*)aucOutput, NUMBER_ENCRYPTION);
+            pEncryptFile->write((char*)aucOutput);
 
             // 重置内存
             memset(aucInput, 0, SIZE_ENCRYPT_MALLOC*sizeof(quint8));
@@ -113,7 +113,7 @@ bool CAES::AESDecryptionFile(QFile *pOriginFile, QFile *pDecryptFile)
             pOriginFile->read((char*)aucInput, NUMBER_DECRYPTION);
             d->AESDecryption(aucInput, aucOutput);
             // 将解密字符串写入
-            pDecryptFile->write((char*)aucOutput, NUMBER_ENCRYPTION);
+            pDecryptFile->write((char*)aucOutput);
 
             // 重置内存
             memset(aucInput, 0, SIZE_DECRYPT_MALLOC*sizeof(quint8));
